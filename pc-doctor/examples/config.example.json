@@ -1,0 +1,19 @@
+{
+  "_comment": "pc-doctor 설정 예시. %LOCALAPPDATA%\\pc-doctor\\config.json 으로 복사해서 쓰세요 (pc-doctor init).",
+  "expected_ram_mts": 6000,
+  "model_dirs": ["D:\\models", "%USERPROFILE%\\llama.cpp\\models"],
+  "gpu_driver_max_age_days": 180,
+  "startup_apps_warn": 15,
+  "disk_warn_percent": 90,
+  "disk_critical_percent": 95,
+  "update_recent_days": 45,
+  "update_stale_days": 60,
+  "gamemode": {
+    "power_plan": "high",
+    "stop_processes": ["OneDrive.exe", "Teams.exe"],
+    "stop_services": [],
+    "relaunch_processes": true,
+    "game_exes": ["Cyberpunk2077.exe", "eldenring.exe"],
+    "poll_seconds": 10
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "_comment": "알려진 문제 목록 예시입니다. 아래 KB 번호(KB0000000, KB0000001)는 형식을 보여 주기 위한 가짜 번호이며 실제 업데이트가 아닙니다. 실제 이슈는 Microsoft 'Windows 릴리스 상태(Release health)' 페이지나 커뮤니티에서 직접 확인한 뒤 적어 넣으세요.",
+  "issues": [
+    {
+      "kb": "KB0000000",
+      "level": "red",
+      "summary": "(예시) 특정 GPU 드라이버와 충돌해 게임 실행 시 블루스크린",
+      "workaround": "(예시) 해결 업데이트가 나올 때까지 설치 일시 중지",
+      "source": "(예시) 출처 URL이나 메모"
+    },
+    {
+      "kb": "KB0000001",
+      "level": "yellow",
+      "summary": "(예시) 일부 환경에서 작업표시줄이 잠깐 멈춤",
+      "workaround": "",
+      "source": ""
+    },
+    {
+      "title_contains": "(예시) 업데이트 제목 일부로도 매칭 가능",
+      "level": "yellow",
+      "summary": "(예시) KB 번호가 없는 드라이버 업데이트 등은 제목으로 매칭",
+      "workaround": "",
+      "source": ""
+    }
+  ]
+}

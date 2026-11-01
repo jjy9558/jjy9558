@@ -1,0 +1,9 @@
+{
+  "appids": [570, 730],
+  "names": {"570": "Dota 2"},
+  "steam_buddy": {"enabled": false, "path": "~/.steam-buddy/data.json"},
+  "llm": {"enabled": true, "base_url": "http://127.0.0.1:8080/v1", "model": "local"},
+  "ntfy": {"server": "https://ntfy.sh", "topic": ""},
+  "dday": [30, 7, 1],
+  "default_tz": "UTC"
+}

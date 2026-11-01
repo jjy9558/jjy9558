@@ -125,24 +125,36 @@ def run(cfg, since=None, dry_run=False, fetcher=None, llm_client=_DEFAULT, now=N
     finally:
         store.close()
 
-    _extras(cfg, result, date_str, stem, out_dir, overview)
+    _extras(cfg, result, date_str, stem, out_dir, overview,
+            llm_client if summarizer.llm_ok else None)
     return result
 
 
-def _extras(cfg, result, date_str, stem, out_dir, overview):
+def _extras(cfg, result, date_str, stem, out_dir, overview, llm=None):
     """Optional steps; failures are logged, never fatal."""
     items = result["items"]
     if cfg["timeline"].get("enabled"):
         try:
-            result["paths"]["timeline"] = timeline.append(items, resolve(cfg, cfg["timeline"]["dir"]), date_str)
+            tdir = resolve(cfg, cfg["timeline"]["dir"])
+            result["paths"]["timeline"] = timeline.append(items, tdir, date_str)
+            result["paths"]["timeline_html"] = timeline.write_html(
+                tdir, os.path.join(out_dir, cfg["timeline"].get("html") or "timeline.html"),
+                int(cfg["timeline"].get("days") or 30))
         except Exception as e:
             logger.warning("timeline failed: %s", e)
     if cfg["tts"].get("enabled"):
         try:
-            opts = {k: v for k, v in cfg["tts"].items() if k not in ("enabled", "backend")}
-            audio = tts.synthesize(tts.build_script(result["json"]), os.path.join(out_dir, stem + ".mp3"),
-                                   cfg["tts"].get("backend", "none"), **opts)
+            t = cfg["tts"]
+            skip = ("enabled", "backend", "style", "use_llm", "feed")
+            opts = {k: v for k, v in t.items() if k not in skip}
+            script = tts.build_script(result["json"], llm if t.get("use_llm", True) else None,
+                                      t.get("style", "monologue"))
+            audio = tts.synthesize(script, os.path.join(out_dir, stem + ".wav"), t.get("backend", "none"), **opts)
             result["paths"]["audio"] = audio
+            feed = t.get("feed") or {}
+            if audio and feed.get("enabled") and feed.get("base_url"):
+                result["paths"]["podcast_feed"] = tts.write_feed(
+                    out_dir, feed["base_url"], feed.get("title") or "커뮤니티 브리핑")
         except Exception as e:
             logger.warning("tts failed: %s", e)
     ntfy = cfg["delivery"]["ntfy"]

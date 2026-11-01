@@ -32,8 +32,14 @@ DEFAULTS = {
     },
     "output": {"dir": "out", "db_path": "data/seen.sqlite3", "since": "24h"},
     "delivery": {"ntfy": {"enabled": False, "server": "https://ntfy.sh", "topic": "", "token": ""}},
-    "tts": {"enabled": False, "backend": "none"},
-    "timeline": {"enabled": False, "dir": "data/timeline"},
+    "tts": {
+        "enabled": False,
+        "backend": "none",        # none | sapi | piper | openai_compat
+        "style": "monologue",     # monologue | dialogue (진행자 A/B)
+        "use_llm": True,          # 대본을 LLM으로 다듬기 (실패하면 템플릿)
+        "feed": {"enabled": False, "base_url": "", "title": "커뮤니티 브리핑"},
+    },
+    "timeline": {"enabled": False, "dir": "data/timeline", "html": "timeline.html", "days": 30},
 }
 
 

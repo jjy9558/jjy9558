@@ -1,10 +1,11 @@
-"""Command line: python -m briefing run|sources"""
+"""Command line: python -m briefing run|sources|timeline"""
 import argparse
 import logging
 import os
 import sys
 
 from . import config as config_mod
+from . import timeline as timeline_mod
 from .pipeline import fetch_source, make_fetcher, parse_duration, run
 
 
@@ -29,6 +30,10 @@ def main(argv=None):
     p_src = sub.add_parser("sources", help="소스 목록 (--test 로 실제 가져오기 시험)")
     p_src.add_argument("--config", default="config.json")
     p_src.add_argument("--test", action="store_true")
+    p_tl = sub.add_parser("timeline", help="이슈 타임라인 보기 + out/timeline.html 다시 만들기")
+    p_tl.add_argument("--config", default="config.json")
+    p_tl.add_argument("--topic", help="토픽/키워드 이름 (일부만 써도 됨). 없으면 목록 출력")
+    p_tl.add_argument("--days", type=int, default=30, help="최근 N일 (기본 30)")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     cfg = _load(args.config)
@@ -45,6 +50,22 @@ def main(argv=None):
                 except Exception as e:
                     line += "\n       FAIL %s" % e
             print(line)
+        return 0
+
+    if args.cmd == "timeline":
+        tdir = config_mod.resolve(cfg, cfg["timeline"]["dir"])
+        html = config_mod.resolve(cfg, os.path.join(cfg["output"]["dir"], cfg["timeline"].get("html") or "timeline.html"))
+        timeline_mod.write_html(tdir, html, args.days)
+        tls = timeline_mod.load_all(tdir, args.days)
+        if args.topic:
+            found = timeline_mod.find(tls, args.topic)
+            print(timeline_mod.render_text(found) if found else "해당 토픽/키워드 기록이 없습니다: %s" % args.topic)
+        else:
+            for tl in tls:
+                print("%-8s %-24s %d건" % ("토픽" if tl["kind"] == "topic" else "키워드", tl["name"], len(tl["events"])))
+            if not tls:
+                print("기록이 없습니다. config의 timeline.enabled 를 true로 하고 run 을 실행하세요.")
+        print("HTML:", html)
         return 0
 
     if args.since:

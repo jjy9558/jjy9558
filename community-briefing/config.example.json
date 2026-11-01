@@ -43,6 +43,19 @@
   },
   "output": {"dir": "out", "db_path": "data/seen.sqlite3", "since": "24h"},
   "delivery": {"ntfy": {"enabled": false, "server": "https://ntfy.sh", "topic": "", "token": ""}},
-  "tts": {"enabled": false, "backend": "none"},
-  "timeline": {"enabled": false, "dir": "data/timeline"}
+  "tts": {
+    "enabled": false,
+    "backend": "sapi",
+    "style": "monologue",
+    "use_llm": true,
+    "voice": "",
+    "rate": 0,
+    "model": "D:\\piper\\ko_KR-voice.onnx",
+    "piper": "piper",
+    "base_url": "http://127.0.0.1:8880/v1",
+    "max_chars": 300,
+    "pause_ms": 250,
+    "feed": {"enabled": false, "base_url": "http://내-PC.tailnet-name.ts.net:8000/", "title": "커뮤니티 브리핑"}
+  },
+  "timeline": {"enabled": false, "dir": "data/timeline", "html": "timeline.html", "days": 30}
 }

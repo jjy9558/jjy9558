@@ -9,7 +9,7 @@
 - SQLite로 지난 실행과 중복 제거 + 서로 다른 소스의 같은 이야기 합치기 (출처 모두 표시)
 - 요약은 **내 PC의 로컬 LLM**(llama.cpp `llama-server` 등 OpenAI 호환 API) 사용,
   서버가 꺼져 있으면 LLM 없이 **추출 요약**으로 자동 대체
-- 선택: ntfy 푸시 알림 / 이슈 타임라인 JSON / 음성 팟캐스트용 대본 (TTS는 스텁)
+- 선택: ntfy 푸시 알림 / **음성 아침 팟캐스트(WAV + 팟캐스트 RSS)** / **이슈 타임라인 HTML 뷰어**
 
 ## 결과물 예시
 
@@ -148,8 +148,67 @@ CP949(EUC-KR) 페이지도 자동으로 디코딩합니다.
 - `output.dir` (기본 `out`), `output.db_path`, `output.since` (기본 `24h`)
 - `delivery.ntfy`: `enabled: true`, `topic`(추측하기 어려운 이름 권장), 필요하면 `server`(자체 호스팅), `token`.
   휴대폰 ntfy 앱에서 같은 토픽을 구독하면 아침마다 3줄 요약 + 상위 5개 링크가 푸시됩니다.
-- `timeline.enabled`: 키워드별 `data/timeline/<키워드>.json`에 기사 기록을 누적 (이슈 타임라인용, 로드맵 참고)
-- `tts.enabled`: 지금은 음성 대신 `out/YYYY-MM-DD.script.txt` 팟캐스트 대본만 생성 (스텁)
+- `timeline.*`, `tts.*`: 아래 "음성 팟캐스트", "이슈 타임라인" 절 참고
+
+## 음성 팟캐스트 (tts)
+
+`tts.enabled: true`면 매 실행마다 그날 브리핑 JSON으로 **듣기 좋은 한국어 구어체 대본**을 만들고,
+선택한 TTS 백엔드로 `out/YYYY-MM-DD.wav` + `out/YYYY-MM-DD.script.txt`를 생성합니다.
+실패해도 브리핑 자체는 영향을 받지 않습니다(경고만 출력).
+
+| 키 | 설명 |
+|---|---|
+| `backend` | `none`(대본만) / `sapi` / `piper` / `openai_compat` |
+| `style` | `monologue`(진행자 1명, 기본) / `dialogue`(진행자 A 민준·B 서연 대화체) |
+| `use_llm` | `true`면 `llm` 설정의 로컬 LLM으로 대본을 다듬음. 서버가 꺼져 있거나 결과가 부실하면 **템플릿 대본**으로 자동 대체 |
+| `voice` / `voices` | 음성 이름. `voices: {"A": "...", "B": "..."}`로 대화체 화자별 음성 지정 (sapi=음성 이름, piper=모델 경로, openai_compat=voice) |
+| `max_chars` / `pause_ms` | 한 번에 합성할 최대 글자 수(기본 300, 문장 경계로 분할) / 조각 사이 무음(기본 250ms) |
+
+백엔드별 설정:
+
+- **sapi** (Windows 내장, 설치 불필요): PowerShell `System.Speech`로 합성. 한국어 음성(예: Microsoft Heami)이
+  설치돼 있어야 합니다 (설정 → 시간 및 언어 → 음성). `voice`에 음성 이름, `rate`(-10~10), `powershell`
+  (기본 `powershell`, PowerShell 7이면 `pwsh`). 텍스트는 임시 파일로만 전달하고, 고정된 `.ps1`을 `-File`
+  인자로 실행하므로 본문이 명령줄이나 스크립트에 끼어들지 않습니다.
+- **piper**: `model`(`.onnx` 경로), 선택 `piper`(실행 파일), `piper_args`(리스트). 텍스트는 stdin으로 전달.
+  한국어 음성 모델이 있어야 자연스럽습니다.
+- **openai_compat**: `POST {base_url}/audio/speech` (`base_url`은 `/v1`까지, 예 `http://127.0.0.1:8880/v1`),
+  `model`, `voice`, `api_key`. 서버가 `wav` 응답을 지원해야 합니다 (Kokoro-FastAPI, openedai-speech 등).
+  시스템 프록시는 거치지 않습니다.
+
+긴 대본은 문장 단위로 잘라 합성한 뒤 표준 `wave` 모듈로 한 개의 WAV로 이어붙입니다
+(조각들의 샘플레이트/채널이 같아야 합니다).
+
+### 폰 팟캐스트 앱으로 구독
+
+```json
+"tts": {"enabled": true, "backend": "sapi", "feed": {"enabled": true, "base_url": "http://내PC.tailnet-name.ts.net:8000/"}}
+```
+
+`feed.enabled`면 실행 후 `out/podcast.xml`(RSS 2.0 + iTunes 태그, 최근 30개 에피소드)을 갱신합니다.
+`out/` 폴더를 Tailscale로 접근 가능하게 서빙하고 폰 팟캐스트 앱에 `.../podcast.xml`을 구독하세요.
+
+```bat
+cd /d D:\community-briefing\out
+python -m http.server 8000 --bind 100.x.y.z
+```
+
+(`100.x.y.z`는 PC의 Tailscale IP. 모든 인터페이스에 여는 `0.0.0.0`은 피하세요.)
+일부 앱은 WAV를 싫어할 수 있고 용량이 큽니다(수십 MB). 필요하면 ffmpeg 등으로 mp3 변환을 별도로 거세요.
+
+## 이슈 타임라인 (timeline)
+
+`timeline.enabled: true`면 실행할 때마다 브리핑 글을 **매칭된 키워드별**(`data/timeline/<키워드>.json`)과
+**토픽별**(`data/timeline/topic__<토픽>.json`)로 누적(URL 중복 제외)하고, 자체 완결형 뷰어
+`out/timeline.html`(외부 파일/CDN 없음)을 다시 만듭니다.
+토픽 선택, 날짜별 세로 타임라인, 링크, 출처 배지, 라이트/다크(시스템 설정) 지원, 폰 화면 대응.
+`timeline.days`(기본 30)는 뷰어에 보여 줄 기간, `timeline.html`은 `output.dir` 안의 파일명입니다.
+
+```bash
+python -m briefing timeline                       # 기록된 토픽/키워드 목록 + timeline.html 재생성
+python -m briefing timeline --topic "로컬 LLM"     # 터미널에 해당 타임라인 출력 (일부만 써도 됨)
+python -m briefing timeline --topic gguf --days 7
+```
 
 ## llama-server 연결하기 (Windows + GPU)
 
@@ -197,7 +256,7 @@ llama-server를 먼저 띄우는 작업을 07:25에 하나 더 만들어 두는 
 
 ```
 briefing/
-  cli.py        python -m briefing run|sources
+  cli.py        python -m briefing run|sources|timeline
   pipeline.py   수집 → 기간 필터 → 점수 → 병합 → 중복 제거 → 요약 → 출력 → (타임라인/TTS/알림)
   fetch.py      User-Agent, 호스트별 지연, ETag 캐시, robots.txt
   parse.py      RSS/Atom, HTML 목록(HTMLParser 기반 추출기)
@@ -206,16 +265,12 @@ briefing/
   summarize.py  OpenAI 호환 클라이언트 + 추출 요약 대체
   render.py     Markdown / JSON
   deliver.py    ntfy
-  timeline.py   (스텁) 키워드별 이슈 타임라인 JSON
-  tts.py        (스텁) synthesize(text, out_path) 인터페이스
+  timeline.py   키워드/토픽별 타임라인 JSON + timeline.html 뷰어
+  tts.py        대본 생성, TTS 백엔드(sapi/piper/openai_compat), WAV 이어붙이기, 팟캐스트 RSS
 ```
 
 ## 로드맵
 
-- **음성 팟캐스트**: `tts.synthesize(text, out_path)`에 한국어 TTS 백엔드 연결
-  (GPU PC에서 MeloTTS / XTTS / Piper 한국어 음성 등을 HTTP로 호출). 대본은 `tts.build_script()`가
-  브리핑 JSON에서 이미 만들고 있습니다. 완성되면 mp3를 ntfy 첨부나 팟캐스트 RSS로 배포.
-- **이슈 타임라인**: `data/timeline/<키워드>.json`에 쌓인 기록으로 "이 이슈가 며칠 동안 어떻게 흘러왔는지"를
-  보여 주는 페이지 생성, LLM으로 타임라인 요약.
+- 타임라인: LLM으로 이슈 흐름 요약, 팟캐스트 mp3 변환/ntfy 첨부
 - 요약 품질: 본문 페이지까지 가져와 요약 (사이트 약관 허용 시), 클러스터 단위 묶음 요약
 - 관심사 학습: 내가 클릭/저장한 글로 키워드 가중치 자동 조정

@@ -1,0 +1,16 @@
+1
+00:00:01,000 --> 00:00:03,500
+I went to the store yesterday with Sarah.
+
+2
+00:00:03,600 --> 00:00:06,000
+Sarah bought three apples
+and two oranges.
+
+3
+00:00:06,500 --> 00:00:09,000
+<i>They were running fast</i>, didn't they?
+
+4
+00:01:05,000 --> 00:01:07,000
+[Music] Let's go home now.

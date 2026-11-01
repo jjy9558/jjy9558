@@ -1,0 +1,16 @@
+WEBVTT
+Kind: captions
+Language: en
+
+NOTE This is a comment
+that spans two lines
+
+STYLE
+::cue { color: white }
+
+intro
+00:00:01.000 --> 00:00:03.000 align:start position:10%
+Welcome to the <i>channel</i>
+
+00:00:03.500 --> 00:00:05.000
+Today we&nbsp;talk about cats &amp; dogs

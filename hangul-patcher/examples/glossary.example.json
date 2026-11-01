@@ -1,0 +1,10 @@
+{
+  "style": "자연스러운 한국어 게임 대사체. 주인공은 반말, NPC 상인은 존댓말.",
+  "terms": {
+    "Alice": "앨리스",
+    "Potion": "포션",
+    "Iron Sword": "철검"
+  },
+  "keep": ["HP", "MP", "TP", "EXP"],
+  "mask_patterns": ["<[A-Za-z]+:[^>]*>"]
+}

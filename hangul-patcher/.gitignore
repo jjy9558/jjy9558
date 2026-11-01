@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.hpatch/
+.hpatch_backup/
+*.sqlite

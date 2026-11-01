@@ -32,6 +32,8 @@ class FakeSteam:
         self.news = {}         # appid -> [unix dates]
         self.owned = []
         self.calls = []
+        self.bundles = {}      # bundle_id -> bundledetails 의 data
+        self.wishlist = None   # {appid: {...}} 또는 None(실패)
 
     def __call__(self, url, params):
         self.calls.append((url, dict(params)))
@@ -53,4 +55,13 @@ class FakeSteam:
         if "GetOwnedGames" in url:
             return {"response": {"game_count": len(self.owned), "games": [
                 {"appid": a, "name": n, "playtime_forever": m} for a, n, m in self.owned]}}
+        if "bundledetails" in url:
+            bid = str(params["bundleids"])
+            if bid not in self.bundles:
+                return {bid: {"success": False}}
+            return {bid: {"success": True, "data": self.bundles[bid]}}
+        if "wishlistdata" in url:
+            if self.wishlist is None:
+                return {"success": 2}
+            return {str(a): {"name": "w"} for a in self.wishlist}
         raise AssertionError("예상 못한 URL: " + url)

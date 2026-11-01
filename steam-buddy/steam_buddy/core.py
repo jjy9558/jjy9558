@@ -1,5 +1,6 @@
 """환불 기한 계산, 얼리액세스 방치 위험 점수, 시간당 만족도 같은 순수 계산만 모아 둔다."""
 
+import math
 from datetime import datetime, timedelta
 
 REFUND_DAYS = 14
@@ -142,3 +143,44 @@ def value_row(game):
         "rating": game.get("rating"),
         "note": game.get("note", ""),
     }
+
+
+def wilson_lower_bound(positive, total, z=1.96):
+    """긍정 비율의 윌슨 신뢰구간 하한(기본 95%). 표본이 적을수록 보수적으로 깎인다."""
+    if total <= 0:
+        return 0.0
+    p = positive / total
+    denom = 1 + z * z / total
+    centre = p + z * z / (2 * total)
+    margin = z * math.sqrt((p * (1 - p) + z * z / (4 * total)) / total)
+    return max(0.0, (centre - margin) / denom)
+
+
+def gem_score(positive, total):
+    """숨은 명작 점수(0~1): 윌슨 하한 70% + 단순 긍정 비율 30%. 30/30이 950/1000을 이기지 못하게 한다."""
+    if total <= 0:
+        return 0.0
+    return 0.7 * wilson_lower_bound(positive, total) + 0.3 * (positive / total)
+
+
+def bundle_value(items, bundle_price):
+    """번들 실가치. items: [{'price': 원, 'owned': bool, 'skipped': bool}, ...].
+
+    이미 가진 게임과 관심 없다고 뺀 게임은 실가치에서 제외한다.
+    """
+    counted = [i for i in items if not i.get("owned") and not i.get("skipped")]
+    full_sum = sum(i["price"] for i in items if not i.get("skipped"))
+    real = sum(i["price"] for i in counted)
+    n = len(counted)
+    per_game = bundle_price / n if n else None
+    gain = real - bundle_price
+    if n == 0:
+        verdict = "살 만한 새 게임이 하나도 없어요. 번들은 필요 없어요."
+    elif gain > 0:
+        verdict = f"번들이 {fmt_won(gain)} 이득이에요."
+    elif full_sum > bundle_price:
+        verdict = "이미 가진 게임 빼면 개별 구매가 더 싸요."
+    else:
+        verdict = f"개별 구매가 {fmt_won(-gain)} 더 싸요."
+    return {"full_sum": full_sum, "real": real, "new_count": n, "per_game": per_game,
+            "gain": gain, "verdict": verdict}

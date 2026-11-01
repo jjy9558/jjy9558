@@ -3,6 +3,7 @@
 import argparse
 import re
 import sys
+import time
 import unicodedata
 from datetime import datetime, timedelta
 
@@ -56,12 +57,14 @@ def parse_when(s, now):
 # ---------- 앱 ----------
 
 class App:
-    def __init__(self, store=None, client=None, now=None, out=None, push=send_ntfy):
+    def __init__(self, store=None, client=None, now=None, out=None, push=send_ntfy, sleep=time.sleep, delay=0.3):
         self.store = store or Store()
         self.client = client or SteamClient()
         self._now = now
         self.out = out or sys.stdout
         self.push = push
+        self._sleep = sleep
+        self.delay = delay  # 연속 API 호출 사이 대기(초). 테스트에서는 0
 
     def now(self):
         return self._now() if callable(self._now) else (self._now or datetime.now())
@@ -337,6 +340,116 @@ class App:
             self.say(f"후회 목록(만족 2 이하): {', '.join(regret)}")
         return 0
 
+    # ----- 번들 실가치 -----
+    def cmd_bundle(self, a):
+        appids = [self.resolve_remote(g) for g in a.games]
+        price = a.price
+        if a.bundle_id:
+            # 실험적(best-effort): 응답 모양이 다르면 읽지 못할 수 있어요
+            try:
+                b = self.client.bundle_details(a.bundle_id)
+            except SteamError as e:
+                if not appids:
+                    raise
+                self.say(f"(번들 정보 조회 실패, 직접 적은 게임만 계산해요: {e})")
+            else:
+                self.say(f"번들: {b['name']}")
+                appids += [x for x in b["appids"] if x not in appids]
+                if price is None:
+                    price = b["price"]
+        if not appids:
+            raise SteamError("계산할 게임이 없어요. 게임을 적거나 --bundle-id를 주세요.")
+        if price is None:
+            raise SteamError("번들 가격을 --price로 알려 주세요.")
+        known = set(self.store.config.get("known_appids", []))
+        skip = set(a.skip or [])
+        items, rows = [], []
+        for appid in appids:
+            d = self.client.app_details(appid)
+            owned = bool(self.store.get(appid)) or appid in known
+            skipped = appid in skip
+            item = {"price": 0 if d["is_free"] else d["price"], "owned": owned, "skipped": skipped}
+            items.append(item)
+            state = "관심없음(제외)" if skipped else "보유" if owned else "새 게임"
+            rows.append([d["name"], core.fmt_won(item["price"]) if item["price"] else "무료/정보없음",
+                         state, d["korean"]])
+        self.say("")
+        table(["게임", "현재가", "상태", "한국어"], rows, self.out)
+        r = core.bundle_value(items, price)
+        self.say(f"\n개별 구매 합계(제외한 것 빼고) {core.fmt_won(r['full_sum'])}")
+        self.say(f"실제 가치(새 게임 {r['new_count']}개) {core.fmt_won(r['real'])}  vs  번들 {core.fmt_won(price)}")
+        if r["per_game"] is not None:
+            self.say(f"새 게임 1개당 실질 {core.fmt_won(r['per_game'])}")
+        self.say(f"→ {r['verdict']}\n")
+        return 0
+
+    # ----- 숨은 명작 탐색 -----
+    def cmd_gems(self, a):
+        cands, notes = [], []
+
+        def add(ids):
+            for i in ids:
+                if i not in cands:
+                    cands.append(i)
+
+        if a.appids:
+            add(int(x) for x in a.appids.split(",") if x.strip().isdigit())
+        if a.from_search:
+            add(h["appid"] for h in self.client.search(a.from_search))
+        if a.wishlist:
+            sid = self.store.config.get("steamid")
+            if not sid:
+                notes.append("위시리스트: 먼저 `config --steamid`로 SteamID64를 설정해 주세요.")
+            else:
+                try:
+                    add(self.client.wishlist(sid))
+                except SteamError as e:
+                    notes.append(f"위시리스트: {e}")
+        for n in notes:
+            self.say(f"({n})")
+        if not cands:
+            raise SteamError("후보가 없어요. --from-search, --appids, --wishlist 중 하나를 주세요.")
+        if len(cands) > a.limit:
+            self.say(f"(후보 {len(cands)}개 중 앞의 {a.limit}개만 확인해요. 더 보려면 --limit)")
+            cands = cands[:a.limit]
+
+        tag = (a.tag or "").lower()
+        found, calls = [], 0
+        for appid in cands:
+            if calls:
+                self._sleep(self.delay)
+            calls += 1
+            try:
+                rv = self.client.reviews(appid)
+            except SteamError:
+                continue
+            if rv["ratio"] is None or not a.min_reviews <= rv["total"] <= a.max_reviews or rv["ratio"] < a.min_ratio:
+                continue
+            self._sleep(self.delay)
+            try:
+                d = self.client.app_details(appid)
+            except SteamError:
+                continue
+            if tag and not any(tag in t.lower() for t in d["genres"] + [d["name"]]):
+                continue
+            if a.korean and d["korean"] == "없음":
+                continue
+            found.append((core.gem_score(rv["positive"], rv["total"]), appid, d, rv))
+        if not found:
+            self.say(f"조건에 맞는 게임이 없어요. ({len(cands)}개 확인)")
+            return 0
+        found.sort(key=lambda t: -t[0])
+        rows = []
+        for sc, appid, d, rv in found:
+            price = "무료" if d["is_free"] else core.fmt_won(d["price"]) if d["price"] else "-"
+            rows.append([d["name"], str(appid), f"{rv['ratio']:.0%}", f"{rv['total']:,}",
+                         f"{core.wilson_lower_bound(rv['positive'], rv['total']):.0%}", f"{sc * 100:.1f}",
+                         price, d["korean"]])
+        self.say("")
+        table(["게임", "appid", "긍정", "리뷰수", "윌슨하한", "점수", "가격", "한국어"], rows, self.out)
+        self.say(f"\n{len(cands)}개 확인, {len(found)}개가 조건에 맞아요. (점수 = 윌슨하한 70% + 긍정비율 30%)")
+        return 0
+
     def cmd_config(self, a):
         cfg = self.store.config
         changed = False
@@ -391,6 +504,23 @@ def build_parser():
     s.add_argument("--note", help="한 줄 메모")
 
     sub.add_parser("report", help="돌아보기: 시간당 비용, 안 켜본 게임, 후회 목록")
+
+    s = sub.add_parser("bundle", help="번들 실가치 계산 (이미 가진 게임 제외)")
+    s.add_argument("games", nargs="*", help="번들에 든 게임 이름 또는 appid")
+    s.add_argument("--price", type=int, help="번들 가격(원). --bundle-id가 가격을 주면 생략 가능")
+    s.add_argument("--bundle-id", type=int, help="(실험적) 스토어 번들 ID로 구성 불러오기")
+    s.add_argument("--skip", type=int, action="append", help="관심 없는 게임 appid (여러 번 가능)")
+
+    s = sub.add_parser("gems", help="숨은 명작 탐색: 긍정 비율은 높고 리뷰 수는 적은 게임")
+    s.add_argument("--from-search", help="검색어로 후보 모으기")
+    s.add_argument("--appids", help="쉼표로 구분한 appid 목록, 예: 1,2,3")
+    s.add_argument("--wishlist", action="store_true", help="(실험적) 공개 위시리스트에서 후보 모으기")
+    s.add_argument("--tag", help="장르/이름에 이 키워드가 든 것만")
+    s.add_argument("--min-reviews", type=int, default=50)
+    s.add_argument("--max-reviews", type=int, default=2000)
+    s.add_argument("--min-ratio", type=float, default=0.9)
+    s.add_argument("--korean", action="store_true", help="한국어 지원 게임만")
+    s.add_argument("--limit", type=int, default=30, help="확인할 후보 수 상한 (기본 30)")
 
     s = sub.add_parser("config", help="설정 보기/바꾸기")
     s.add_argument("--key", help="Steam Web API 키 (https://steamcommunity.com/dev/apikey)")

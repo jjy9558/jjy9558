@@ -141,3 +141,25 @@ class ValueRowTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WilsonTests(unittest.TestCase):
+    def test_zero_total(self):
+        self.assertEqual(core.wilson_lower_bound(0, 0), 0.0)
+
+    def test_known_value(self):
+        self.assertAlmostEqual(core.wilson_lower_bound(950, 1000), 0.9344, places=3)
+
+    def test_small_sample_penalized(self):
+        self.assertLess(core.wilson_lower_bound(30, 30), core.wilson_lower_bound(950, 1000))
+
+    def test_gem_score_prefers_big_sample(self):
+        self.assertGreater(core.gem_score(950, 1000), core.gem_score(30, 30))
+
+    def test_bundle_value(self):
+        items = [{"price": 10000, "owned": True}, {"price": 20000}, {"price": 5000, "skipped": True}]
+        r = core.bundle_value(items, 25000)
+        self.assertEqual((r["real"], r["full_sum"], r["new_count"]), (20000, 30000, 1))
+        self.assertIn("개별 구매가 더 싸요", r["verdict"])
+        self.assertIn("이득", core.bundle_value([{"price": 30000}], 20000)["verdict"])
+        self.assertIn("필요 없어요", core.bundle_value([{"price": 1, "owned": True}], 5)["verdict"])

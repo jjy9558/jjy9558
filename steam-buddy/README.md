@@ -6,6 +6,8 @@
 - **살 때** `buy`: 구매를 기록하고 환불 기한 추적 시작
 - **산 뒤** `status` / `alert` / `keep`: 환불 기한 현황, 임박 시 폰 알림, 계속 갖기로 결정
 - **돌아보기** `rate` / `report`: 만족도 기록, 시간당 비용, 안 켜본 게임, 후회 목록
+- **번들 실가치** `bundle`: 이미 가진 게임을 빼고 번들이 정말 이득인지 계산
+- **숨은 명작** `gems`: 긍정 비율은 높은데 리뷰 수는 적은 게임 찾기
 
 ## 환불 규칙 (중요)
 
@@ -39,9 +41,41 @@ python -m steam_buddy refunded Hades                # 환불했음 (통계에서
 python -m steam_buddy rate Hades 5 --note "명작"    # 만족도 1~5
 python -m steam_buddy report                        # 시간당 비용 돌아보기
 python -m steam_buddy remove Hades                  # 기록 삭제
+python -m steam_buddy bundle 10 11 --price 50000    # 번들 실가치 (아래 설명)
+python -m steam_buddy gems --from-search "deck"     # 숨은 명작 (아래 설명)
 ```
 
 이름이 여러 게임에 걸리면 오류가 나니 appid로 지정하세요.
+
+## 번들 실가치 계산기 (`bundle`)
+
+번들에 든 게임의 현재 KRW 가격을 모아, **이미 가진 게임을 뺀** 실제 가치와 번들 가격을 비교합니다. "가진 게임"은 `buy`로 기록한 게임 또는 `sync`로 저장된 보유 목록(`known_appids`)입니다.
+
+```
+python -m steam_buddy bundle Hades "Hades II" 1145360 --price 50000
+python -m steam_buddy bundle 10 11 20 --price 35000 --skip 20     # 20번은 관심 없어서 제외
+python -m steam_buddy bundle --bundle-id 12345 [--price 50000]    # 실험적
+```
+
+출력: 게임별 현재가/상태(보유, 새 게임, 관심없음)/한국어 지원 표, 개별 구매 합계, 새 게임 기준 실제 가치 vs 번들 가격, 새 게임 1개당 실질 가격, 한 줄 결론(예: "번들이 ₩5,000 이득이에요", "이미 가진 게임 빼면 개별 구매가 더 싸요").
+
+`--bundle-id`는 `https://store.steampowered.com/api/bundledetails?bundleids=<id>&cc=KR&l=korean` 응답을 읽는 **best-effort** 기능입니다. 공식 문서가 없는 엔드포인트라 응답 모양을 `{"<id>": {"success": true, "data": {"name", "apps"|"appids", "price.final"|"final_price"}}}` 로 가정했고, 읽지 못하면 오류 안내만 하니 그때는 게임을 직접 적으세요. 번들 가격은 이 API가 가격을 못 주면 `--price`가 필요합니다.
+
+## 숨은 명작 탐색기 (`gems`)
+
+후보 게임 중 긍정 비율이 높고 리뷰 수는 적은 것만 골라 순위를 매깁니다. 점수는 **윌슨 신뢰구간 하한 70% + 긍정 비율 30%**라서, 30/30 같은 작은 표본이 950/1000을 부당하게 앞서지 못합니다.
+
+```
+python -m steam_buddy gems --from-search "roguelike" --korean
+python -m steam_buddy gems --appids 1145360,413150 --min-reviews 50 --max-reviews 2000 --min-ratio 0.9
+python -m steam_buddy gems --from-search "puzzle" --tag puzzle --limit 20
+python -m steam_buddy gems --wishlist          # 실험적, SteamID64 설정 필요
+```
+
+- 후보 출처: `--from-search`(스토어 검색), `--appids 1,2,3`, `--wishlist`(합쳐 쓸 수 있음). 기본값은 리뷰 50~2000개, 긍정 90% 이상.
+- `--tag`는 장르 이름/게임 이름에 키워드가 들어 있는지 봅니다(스토어 사용자 태그는 아님). `--korean`은 한국어 지원 게임만.
+- API 호출을 아끼려고 후보는 기본 30개까지만 보고(`--limit`), 요청 사이에 0.3초씩 쉽니다. 리뷰 조건을 통과한 게임만 상세 정보를 조회합니다.
+- `--wishlist`는 옛 `wishlistdata` 엔드포인트(첫 페이지만)라 Steam이 막았거나 위시리스트가 비공개면 실패할 수 있습니다. 실패해도 안내 메시지만 내고 다른 후보로 계속합니다.
 
 ## Steam Web API 키와 SteamID64 (선택, `sync`용)
 

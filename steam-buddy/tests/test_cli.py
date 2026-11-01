@@ -285,3 +285,117 @@ class MainTests(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BundleTests(Base):
+    def setUp(self):
+        super().setUp()
+        self.fake.details.update(details_payload(20, "Korean-less", price=10000, langs="English"))
+
+    def test_owned_excluded(self):
+        self.run_cmd("buy", "10")
+        self.assertEqual(self.run_cmd("bundle", "10", "11", "--price", "50000"), 0)
+        t = self.text()
+        self.assertIn("보유", t)
+        self.assertIn("실제 가치(새 게임 1개) ₩30,000", t)
+        self.assertIn("개별 구매가 더 싸요", t)
+
+    def test_known_appids_and_skip(self):
+        self.app.store.config["known_appids"] = [10]
+        self.run_cmd("bundle", "10", "11", "20", "--price", "35000", "--skip", "20")
+        t = self.text()
+        self.assertIn("관심없음", t)
+        self.assertIn("새 게임 1개당 실질 ₩35,000", t)
+        self.assertIn("개별 구매가 더 싸요", t)
+
+    def test_gain_and_korean_column(self):
+        self.run_cmd("bundle", "10", "20", "--price", "20000")
+        t = self.text()
+        self.assertIn("₩16,000 이득", t)
+        self.assertIn("없음", t)
+
+    def test_bundle_id(self):
+        self.fake.bundles["7"] = {"name": "팩", "apps": [{"id": 10}, {"id": 11}], "price": {"final": 4000000}}
+        self.run_cmd("bundle", "--bundle-id", "7")
+        t = self.text()
+        self.assertIn("팩", t)
+        self.assertIn("₩16,000 이득", t)
+
+    def test_bundle_id_failure_and_missing_price(self):
+        with self.assertRaises(SteamError):
+            self.run_cmd("bundle", "--bundle-id", "99")
+        with self.assertRaises(SteamError):
+            self.run_cmd("bundle", "10")
+
+
+class GemsTests(Base):
+    def setUp(self):
+        super().setUp()
+        self.sleeps = []
+        self.app._sleep = self.sleeps.append
+        self.app.delay = 0
+        d = self.fake.details
+        d.update(details_payload(30, "Tiny Perfect", price=5000))
+        d.update(details_payload(31, "Solid Gem", price=8000, langs="English"))
+        d.update(details_payload(32, "Huge Hit", price=9000))
+        d.update(details_payload(33, "Meh", price=9000))
+        self.fake.reviews[(30, "all")] = (55, 5)
+        self.fake.reviews[(31, "all")] = (950, 50)
+        self.fake.reviews[(32, "all")] = (90000, 1000)
+        self.fake.reviews[(33, "all")] = (60, 40)
+
+    def make_app(self, now=NOW):
+        super().make_app(now)
+        self.app.delay = 0
+        self.app._sleep = lambda s: None
+
+    def test_filter_and_rank(self):
+        self.run_cmd("gems", "--appids", "30,31,32,33")
+        t = self.text()
+        self.assertIn("Solid Gem", t)
+        self.assertIn("Tiny Perfect", t)
+        self.assertNotIn("Huge Hit", t)
+        self.assertNotIn("Meh", t)
+        self.assertLess(t.index("Solid Gem"), t.index("Tiny Perfect"))
+
+    def test_korean_and_tag(self):
+        self.run_cmd("gems", "--appids", "30,31", "--korean")
+        self.assertNotIn("Solid Gem", self.text())
+        self.run_cmd("gems", "--appids", "30,31", "--tag", "action")
+        self.assertIn("Solid Gem", self.text())
+        self.run_cmd("gems", "--appids", "30,31", "--tag", "rpg")
+        self.assertIn("조건에 맞는 게임이 없어요", self.text())
+
+    def test_from_search_and_cap(self):
+        self.fake.search_items = [{"id": i, "name": f"g{i}"} for i in range(100, 150)]
+        self.fake.calls.clear()
+        self.run_cmd("gems", "--from-search", "x", "--limit", "5")
+        rv_calls = [c for c in self.fake.calls if "appreviews" in c[0]]
+        self.assertEqual(len(rv_calls), 5)
+        self.assertIn("앞의 5개만", self.text())
+
+    def test_delay_between_requests(self):
+        self.sleeps = []
+        self.app._sleep = self.sleeps.append
+        self.app.delay = 0.5
+        self.run_cmd("gems", "--appids", "30,31")
+        self.assertTrue(self.sleeps)
+        self.assertTrue(all(s == 0.5 for s in self.sleeps))
+
+    def test_wishlist(self):
+        self.app.store.config["steamid"] = "7656"
+        self.fake.wishlist = [31]
+        self.run_cmd("gems", "--wishlist")
+        self.assertIn("Solid Gem", self.text())
+
+    def test_wishlist_failure_graceful(self):
+        self.app.store.config["steamid"] = "7656"
+        self.fake.wishlist = None
+        self.run_cmd("gems", "--wishlist", "--appids", "31")
+        t = self.text()
+        self.assertIn("위시리스트를 가져오지 못했어요", t)
+        self.assertIn("Solid Gem", t)
+
+    def test_no_candidates(self):
+        with self.assertRaises(SteamError):
+            self.run_cmd("gems")

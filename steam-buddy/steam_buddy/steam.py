@@ -99,6 +99,41 @@ class SteamClient:
             for g in games
         ]
 
+    def bundle_details(self, bundle_id):
+        """번들 구성 게임과 가격 (best-effort).
+
+        bundledetails 응답 모양은 공식 문서가 없어 {"<id>": {"success": true, "data": {...}}} 로 가정한다.
+        data에서 name, 구성 앱(apps: [{id, name}] 또는 appids: [..]), 가격(price.final 또는 final_price,
+        원화는 100배 값)을 읽고, 못 읽는 항목은 비워 둔다.
+        """
+        data = self.fetch(f"{STORE}/api/bundledetails",
+                          {"bundleids": bundle_id, "cc": self.cc, "l": "korean"})
+        entry = (data or {}).get(str(bundle_id)) if isinstance(data, dict) else None
+        if not isinstance(entry, dict) or not entry.get("success", True) or not isinstance(entry.get("data"), dict):
+            raise SteamError(f"번들 {bundle_id} 정보를 읽지 못했어요. 게임을 직접 적어 주세요.")
+        d = entry["data"]
+        appids = []
+        for a in d.get("apps") or []:
+            aid = a.get("id", a.get("appid")) if isinstance(a, dict) else a
+            if str(aid).isdigit():
+                appids.append(int(aid))
+        for aid in d.get("appids") or []:
+            if str(aid).isdigit() and int(aid) not in appids:
+                appids.append(int(aid))
+        raw = (d.get("price") or {}).get("final") if isinstance(d.get("price"), dict) else None
+        if raw is None:
+            raw = d.get("final_price")
+        return {"name": d.get("name", str(bundle_id)), "appids": appids,
+                "price": int(raw) // 100 if raw is not None else None}
+
+    def wishlist(self, steamid):
+        """공개 위시리스트의 appid 목록. 옛 wishlistdata 엔드포인트라 막혀 있을 수 있다(첫 페이지만)."""
+        data = self.fetch(f"{STORE}/wishlist/profiles/{steamid}/wishlistdata/", {"p": 0})
+        if not isinstance(data, dict) or not data or "success" in data:
+            raise SteamError("위시리스트를 가져오지 못했어요. 비공개이거나 Steam이 이 방식을 막았을 수 있어요. "
+                             "--appids나 --from-search를 쓰세요.")
+        return [int(k) for k in data if str(k).isdigit()]
+
 
 def korean_support(languages_html):
     """supported_languages 문자열에서 한국어 지원 수준을 읽는다.

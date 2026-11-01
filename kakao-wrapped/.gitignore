@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+# 실제 대화 내보내기 / 결과물은 커밋하지 마세요 (examples/ 의 가짜 샘플 제외)
+wrapped.html
+wrapped.json
+KakaoTalk*.txt
+KakaoTalk*.csv
+Talk_*.txt

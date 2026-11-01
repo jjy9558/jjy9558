@@ -1,0 +1,48 @@
+{
+  "sources": [
+    {"name": "GeekNews", "type": "rss", "url": "https://news.hada.io/rss"},
+    {"name": "Hacker News", "type": "rss", "url": "https://hnrss.org/frontpage"},
+    {"name": "r/LocalLLaMA", "type": "rss", "url": "https://www.reddit.com/r/LocalLLaMA/.rss", "delay": 5},
+    {
+      "name": "예시 게시판 (HTML)",
+      "type": "html",
+      "enabled": false,
+      "url": "https://example.com/board/list",
+      "rules": {"tag": "td", "class": "subject", "href_regex": "/board/view/\\d+"},
+      "max_items": 30
+    }
+  ],
+  "interests": {
+    "topics": {
+      "로컬 LLM": {"llama.cpp": 4, "llm": 3, "로컬 llm": 3, "gguf": 3, "양자화": 2, "quantization": 2, "ollama": 2},
+      "GPU/하드웨어": {"gpu": 2, "rtx": 2, "vram": 2, "그래픽카드": 2, "cuda": 1.5},
+      "개발 도구": {"python": 1.5, "파이썬": 1.5, "rust": 1, "오픈소스": 1, "open source": 1}
+    },
+    "mute": ["코인", "crypto", "nft", "광고", "sponsored"],
+    "comment_boost": 0.5,
+    "multi_source_boost": 0.5,
+    "min_score": 1.0,
+    "top_n": 15
+  },
+  "dedupe": {"title_similarity": 0.82, "remember_days": 14},
+  "fetch": {
+    "user_agent": "community-briefing/0.1 (personal RSS reader; contact: you@example.com)",
+    "delay_seconds": 2.0,
+    "timeout": 20,
+    "cache_dir": "cache",
+    "respect_robots": true
+  },
+  "llm": {
+    "enabled": true,
+    "base_url": "http://127.0.0.1:8080/v1",
+    "model": "local",
+    "api_key": "",
+    "timeout": 60,
+    "temperature": 0.3,
+    "use_proxy": false
+  },
+  "output": {"dir": "out", "db_path": "data/seen.sqlite3", "since": "24h"},
+  "delivery": {"ntfy": {"enabled": false, "server": "https://ntfy.sh", "topic": "", "token": ""}},
+  "tts": {"enabled": false, "backend": "none"},
+  "timeline": {"enabled": false, "dir": "data/timeline"}
+}

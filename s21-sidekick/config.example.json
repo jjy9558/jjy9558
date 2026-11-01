@@ -1,0 +1,49 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8765,
+    "token": "여기에-긴-무작위-토큰을-넣으세요"
+  },
+  "llm": {
+    "base_url": "http://127.0.0.1:8080/v1",
+    "api_key": "",
+    "model": "local"
+  },
+  "vision": {
+    "base_url": "",
+    "api_key": "",
+    "model": "local"
+  },
+  "debugger": {
+    "triggers": ["왜 안 돼", "왜 안되지", "왜 이래", "에러 뭐야", "오류 뭐야", "뭐가 문제야", "또 터졌네"],
+    "cooldown_seconds": 60,
+    "mode": "log_tail",
+    "log_file": "C:/dev/myapp/logs/dev.log",
+    "tail_lines": 200,
+    "command": ["claude", "-p", "{prompt}"],
+    "cwd": "C:/dev/myapp",
+    "timeout_seconds": 180
+  },
+  "alarm": {
+    "enabled": true,
+    "time": "07:00",
+    "snooze_minutes": 5,
+    "max_snoozes": 2,
+    "max_ring_minutes": 60,
+    "emergency_code": "482915",
+    "fallback_camera_seconds": 45,
+    "requirement": "칫솔을 들고 있는 얼굴, 또는 욕실 세면대 앞에 서 있는 모습"
+  },
+  "butler": {
+    "cooldown_seconds": 600,
+    "providers": [
+      {"name": "greeting"},
+      {"name": "calendar_ics", "path": "C:/Users/me/calendar.ics"},
+      {"name": "claude_status", "path": "C:/Users/me/.sidekick/claude_status.txt"},
+      {"name": "weather"},
+      {"name": "delivery"}
+    ],
+    "motion": {"threshold": 18, "min_changed_ratio": 0.08}
+  },
+  "stt": {"model": "small", "device": "cuda", "compute_type": "float16", "language": "ko"}
+}

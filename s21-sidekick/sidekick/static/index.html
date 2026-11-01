@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S21 Sidekick</title>
+<style>
+  :root { color-scheme: dark; --bg:#111; --fg:#eee; --mut:#999; --ac:#5aa9ff; --bad:#ff5a5a; --ok:#4cd17b; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--fg); }
+  header { display:flex; gap:.5rem; align-items:center; padding:.6rem; border-bottom:1px solid #333; }
+  header h1 { font-size:1rem; margin:0; flex:1; }
+  nav { display:flex; }
+  nav button { flex:1; padding:.9rem; background:#1b1b1b; color:var(--fg); border:0; border-bottom:3px solid transparent; font-size:1rem; }
+  nav button.on { border-color:var(--ac); }
+  section { display:none; padding:1rem; }
+  section.on { display:block; }
+  button.big { width:100%; padding:1rem; font-size:1.1rem; margin:.4rem 0; border-radius:.6rem; border:0; background:var(--ac); color:#000; }
+  button.alt { background:#333; color:var(--fg); }
+  button.warn { background:var(--bad); color:#000; }
+  input, select { font-size:1rem; padding:.5rem; background:#222; color:var(--fg); border:1px solid #444; border-radius:.4rem; }
+  video { width:100%; max-height:45vh; background:#000; border-radius:.6rem; }
+  .muted { color:var(--mut); font-size:.85rem; }
+  .row { display:flex; gap:.5rem; align-items:center; margin:.4rem 0; }
+  .row > * { flex:1; }
+  #log { font-size:.85rem; max-height:30vh; overflow:auto; border-top:1px solid #333; padding:.5rem; }
+  #log div { margin:.2rem 0; }
+  .banner { background:#5a3b00; padding:.6rem; font-size:.85rem; display:none; }
+  #ringing { display:none; border:2px solid var(--bad); border-radius:.6rem; padding:.6rem; margin-top:.6rem; }
+  body.ring { animation: flash 1s infinite; }
+  @keyframes flash { 50% { background:#400; } }
+  .say { font-size:1.2rem; margin:.6rem 0; min-height:1.5em; }
+</style>
+</head>
+<body>
+<header>
+  <h1>S21 Sidekick <span id="conn" class="muted">연결 안 됨</span></h1>
+  <button id="startBtn" class="alt">시작</button>
+</header>
+<div id="insecure" class="banner">이 페이지는 보안 컨텍스트(HTTPS/localhost)가 아니어서 카메라·마이크가 막힐 수 있어요. <code>tailscale serve</code>로 HTTPS 주소를 쓰세요 (README 참고).</div>
+<div id="notoken" class="banner">토큰이 없어요. 주소 끝에 <code>#token=...</code>을 붙여 열거나 아래에 입력하세요.
+  <div class="row"><input id="tokenInput" placeholder="token"><button id="tokenSave" class="alt">저장</button></div></div>
+<nav>
+  <button data-tab="dbg" class="on">디버거</button>
+  <button data-tab="alarm">알람</button>
+  <button data-tab="butler">집사</button>
+</nav>
+<div class="say" id="lastSay" style="padding:0 1rem"></div>
+
+<section id="dbg" class="on">
+  <p class="muted">"아 이거 왜 안 돼", "에러 뭐야" 같은 혼잣말을 들으면 PC가 최근 에러를 보고 짧게 알려줘요.</p>
+  <div class="row">
+    <select id="sttMode"><option value="browser">폰 음성 인식 (기본, 설치 불필요)</option><option value="pc">PC 음성 인식 (faster-whisper)</option></select>
+  </div>
+  <button id="listenBtn" class="big">듣기 시작</button>
+  <div class="muted" id="heard">-</div>
+  <div class="row"><input id="typed" placeholder="직접 입력 테스트 (예: 왜 안되지)"><button id="typedSend" class="alt">보내기</button></div>
+</section>
+
+<section id="alarm">
+  <div class="row"><span>알람 시각</span><input id="alarmTime" type="time"><button id="alarmSet" class="alt">설정</button></div>
+  <div class="muted" id="alarmInfo">-</div>
+  <p class="muted">밤에 이 탭을 열고 상단 '시작'을 눌러 두세요 (소리 재생 권한 + 화면 켜짐 유지). 충전기에 꽂아 두는 걸 추천.</p>
+  <button id="alarmTest" class="alt big">테스트로 지금 울리기</button>
+  <div id="ringing">
+    <b>일어나세요! 칫솔을 든 얼굴이나 세면대를 보여주세요.</b>
+    <video id="alarmVideo" autoplay playsinline muted></video>
+    <button id="shotBtn" class="big">사진 보내서 판정받기</button>
+    <div id="manualBox" style="display:none">
+      <div class="muted" id="manualInfo"></div>
+      <div class="row" id="qRow" style="display:none"><span id="question"></span><input id="answer" inputmode="numeric"><button id="answerBtn" class="alt">제출</button></div>
+    </div>
+    <div class="row"><button id="snoozeBtn" class="alt">스누즈</button></div>
+    <details><summary class="muted">비상 해제</summary>
+      <div class="row"><input id="emCode" inputmode="numeric" placeholder="비상 코드"><button id="emBtn" class="warn">해제</button></div>
+    </details>
+  </div>
+</section>
+
+<section id="butler">
+  <p class="muted">현관을 향해 폰을 두면 움직임을 감지해서 오늘 요약을 읽어줘요.</p>
+  <button id="homeBtn" class="big">나 왔어</button>
+  <button id="motionBtn" class="big alt">현관 모션 감지 켜기</button>
+  <video id="motionVideo" autoplay playsinline muted style="display:none"></video>
+  <div class="muted" id="motionInfo"></div>
+</section>
+
+<div id="log"></div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const state = { token: "", lastEvent: 0, started: false, cfg: null, wake: null };
+
+// ---------- 토큰 / API ----------
+(function initToken() {
+  const m = location.hash.match(/token=([^&]+)/);
+  if (m) { localStorage.setItem("sidekickToken", decodeURIComponent(m[1])); history.replaceState(null, "", location.pathname); }
+  state.token = localStorage.getItem("sidekickToken") || "";
+  $("notoken").style.display = state.token ? "none" : "block";
+  $("insecure").style.display = window.isSecureContext ? "none" : "block";
+})();
+$("tokenSave").onclick = () => { localStorage.setItem("sidekickToken", $("tokenInput").value.trim()); location.reload(); };
+
+async function api(path, body, opts) {
+  const o = Object.assign({ method: body === undefined ? "GET" : "POST", headers: { "X-Sidekick-Token": state.token } }, opts || {});
+  if (body !== undefined && !(body instanceof Blob)) { o.headers["Content-Type"] = "application/json"; o.body = JSON.stringify(body); }
+  else if (body instanceof Blob) { o.headers["Content-Type"] = body.type || "application/octet-stream"; o.body = body; }
+  const r = await fetch(path, o);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+  return j;
+}
+function log(msg) { const d = document.createElement("div"); d.textContent = new Date().toLocaleTimeString() + "  " + msg; $("log").prepend(d); }
+
+// ---------- 탭 ----------
+document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
+  document.querySelectorAll("nav button, section").forEach((x) => x.classList.remove("on"));
+  b.classList.add("on"); $(b.dataset.tab).classList.add("on");
+});
+
+// ---------- 말하기 (TTS) ----------
+let koVoice = null;
+function pickVoice() { koVoice = (speechSynthesis.getVoices() || []).find((v) => v.lang && v.lang.startsWith("ko")) || null; }
+if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+function speak(text) {
+  $("lastSay").textContent = text;
+  if (!("speechSynthesis" in window) || !text) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "ko-KR"; if (koVoice) u.voice = koVoice; u.rate = 1.05;
+  speechSynthesis.speak(u);
+}
+
+// ---------- 시작: 화면 켜짐 + 소리 권한 + 폴링 ----------
+async function keepAwake() {
+  try { if ("wakeLock" in navigator) { state.wake = await navigator.wakeLock.request("screen"); } }
+  catch (e) { log("Wake Lock 실패: " + e.message); }
+}
+document.addEventListener("visibilitychange", () => { if (state.started && document.visibilityState === "visible") keepAwake(); });
+$("startBtn").onclick = async () => {
+  unlockAudio(); speak("시작할게요.");
+  await keepAwake();
+  if (state.started) return;
+  state.started = true; $("startBtn").textContent = "실행 중";
+  pollEvents(); pollAlarm();
+};
+async function pollEvents() {
+  let first = true;
+  while (true) {
+    try {
+      const j = await api("/api/events?since=" + state.lastEvent + "&wait=" + (first ? 0 : 25));
+      $("conn").textContent = "연결됨";
+      if (first) { first = false; state.lastEvent = j.last_id; continue; } // 접속 전 쌓인 옛 이벤트는 읽지 않음
+      for (const ev of j.events) { state.lastEvent = Math.max(state.lastEvent, ev.id); if (ev.kind === "say") { speak(ev.text); log("말함: " + ev.text); } }
+    } catch (e) { $("conn").textContent = "연결 끊김"; log(e.message); await sleep(3000); }
+  }
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ---------- 카메라 ----------
+async function openCamera(video, facing) {
+  const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: 640, height: 480 }, audio: false });
+  video.srcObject = s; video.style.display = "block"; await video.play().catch(() => {}); return s;
+}
+function stopStream(s) { if (s) s.getTracks().forEach((t) => t.stop()); }
+function snapshot(video, w) {
+  const c = document.createElement("canvas"); const r = (video.videoHeight || 480) / (video.videoWidth || 640);
+  c.width = w; c.height = Math.round(w * r); c.getContext("2d").drawImage(video, 0, 0, c.width, c.height);
+  return c;
+}
+
+// ---------- 1) 혼잣말 디버거 ----------
+const dbg = { on: false, rec: null, media: null, stream: null };
+async function sendUtterance(text) {
+  $("heard").textContent = "들음: " + text;
+  try { const j = await api("/api/utterance", { text }); if (j.status !== "ignored") log("디버거: " + j.status + " (" + j.phrase + ")"); }
+  catch (e) { log(e.message); }
+}
+$("typedSend").onclick = () => { const t = $("typed").value.trim(); if (t) sendUtterance(t); $("typed").value = ""; };
+$("listenBtn").onclick = () => dbg.on ? stopListening() : startListening();
+function startListening() {
+  dbg.on = true; $("listenBtn").textContent = "듣기 중지"; unlockAudio();
+  if ($("sttMode").value === "pc") return startPcStt();
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { log("이 브라우저는 음성 인식을 지원하지 않아요. Android Chrome을 쓰거나 PC 음성 인식을 고르세요."); return stopListening(); }
+  const rec = new SR(); dbg.rec = rec;
+  rec.lang = "ko-KR"; rec.continuous = true; rec.interimResults = true;
+  rec.onresult = (e) => {
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript.trim();
+      if (e.results[i].isFinal) { if (t && !speechSynthesis.speaking) sendUtterance(t); }
+      else $("heard").textContent = "… " + t;
+    }
+  };
+  rec.onerror = (e) => { if (e.error !== "no-speech" && e.error !== "aborted") log("음성 인식 오류: " + e.error); };
+  rec.onend = () => { if (dbg.on && dbg.rec === rec) setTimeout(() => { try { rec.start(); } catch (_) {} }, 300); };
+  rec.start();
+}
+async function startPcStt() {
+  try { dbg.stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { log("마이크 실패: " + e.message); return stopListening(); }
+  (async function loop() {
+    while (dbg.on && dbg.stream) {
+      const chunks = []; const mr = new MediaRecorder(dbg.stream); dbg.media = mr;
+      mr.ondataavailable = (e) => chunks.push(e.data);
+      const done = new Promise((r) => mr.onstop = r);
+      mr.start(); await sleep(5000); if (mr.state !== "inactive") mr.stop(); await done;
+      if (speechSynthesis.speaking) continue;
+      const blob = new Blob(chunks, { type: mr.mimeType || "audio/webm" });
+      api("/api/transcribe", blob).then((j) => { if (j.text) $("heard").textContent = "들음: " + j.text; }).catch((e) => log(e.message));
+    }
+  })();
+}
+function stopListening() {
+  dbg.on = false; $("listenBtn").textContent = "듣기 시작";
+  if (dbg.rec) { const r = dbg.rec; dbg.rec = null; try { r.stop(); } catch (_) {} }
+  if (dbg.media && dbg.media.state !== "inactive") dbg.media.stop();
+  stopStream(dbg.stream); dbg.stream = null;
+}
+
+// ---------- 2) 침대 탈출 알람 ----------
+let audioCtx = null, beepTimer = null, alarmStream = null, manualTimer = null;
+function unlockAudio() {
+  try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch (_) {}
+}
+function beep() {
+  if (!audioCtx) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = "square"; o.frequency.value = 880 + Math.random() * 400; g.gain.value = 1.0;
+  o.connect(g).connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + 0.35);
+  if (navigator.vibrate) navigator.vibrate(300);
+}
+async function startRinging() {
+  if (beepTimer) return;
+  document.body.classList.add("ring"); $("ringing").style.display = "block";
+  document.querySelector('nav button[data-tab="alarm"]').click();
+  beepTimer = setInterval(beep, 500); beep();
+  try { alarmStream = await openCamera($("alarmVideo"), "user"); } catch (e) { log("카메라 실패: " + e.message); }
+  if (state.cfg && !state.cfg.vision) startManualMode();
+}
+function stopRinging() {
+  if (!beepTimer) return;
+  clearInterval(beepTimer); beepTimer = null; clearInterval(manualTimer); manualTimer = null;
+  document.body.classList.remove("ring"); $("ringing").style.display = "none"; $("manualBox").style.display = "none";
+  stopStream(alarmStream); alarmStream = null;
+}
+async function sendShot() {
+  if (!alarmStream) return log("카메라가 꺼져 있어요");
+  const img = snapshot($("alarmVideo"), 512).toDataURL("image/jpeg", 0.8);
+  const j = await api("/api/alarm/check", { image: img });
+  if (j.verdict === "wait") { $("manualInfo").textContent = "카메라 유지 중… " + j.remaining + "초 남음"; return j; }
+  if (j.verdict === "challenge") { $("qRow").style.display = "flex"; $("question").textContent = j.question; $("manualInfo").textContent = "문제를 풀어주세요"; clearInterval(manualTimer); manualTimer = null; return j; }
+  speak(j.say); log("알람: " + j.say);
+  if (j.verdict === "approved") stopRinging();
+  return j;
+}
+function startManualMode() {
+  $("manualBox").style.display = "block"; $("shotBtn").style.display = "none";
+  manualTimer = setInterval(() => sendShot().catch((e) => log(e.message)), 3000);
+}
+$("shotBtn").onclick = () => sendShot().catch((e) => log(e.message));
+$("answerBtn").onclick = async () => {
+  const j = await api("/api/alarm/answer", { answer: $("answer").value }); speak(j.say); $("answer").value = "";
+  if (j.ok) stopRinging(); else { $("qRow").style.display = "none"; startManualModeTimerOnly(); }
+};
+function startManualModeTimerOnly() { if (!manualTimer) manualTimer = setInterval(() => sendShot().catch((e) => log(e.message)), 3000); }
+$("snoozeBtn").onclick = async () => { const j = await api("/api/alarm/snooze", {}); speak(j.say); if (j.ok) stopRinging(); };
+$("emBtn").onclick = async () => { const j = await api("/api/alarm/emergency", { code: $("emCode").value }); speak(j.say); $("emCode").value = ""; if (j.ok) stopRinging(); };
+$("alarmSet").onclick = async () => { const j = await api("/api/alarm/set", { time: $("alarmTime").value }); showAlarm(j); log("알람 " + j.time); };
+$("alarmTest").onclick = async () => { unlockAudio(); const j = await api("/api/alarm/test", {}); showAlarm(j); };
+function showAlarm(s) {
+  $("alarmTime").value = s.time;
+  $("alarmInfo").textContent = "알람 " + s.time + " · 판정: " + (s.mode === "vision" ? "비전 모델" : "수동 확인(카메라+산수)") +
+    " · 남은 스누즈 " + s.snoozes_left + (s.snoozed_until ? " · 스누즈 중 ~" + s.snoozed_until : "") + (s.dismissed_by ? " · 오늘 해제됨(" + s.dismissed_by + ")" : "");
+  if (s.ringing) startRinging(); else stopRinging();
+}
+async function pollAlarm() {
+  try { state.cfg = await api("/api/config"); } catch (e) { log(e.message); }
+  while (true) {
+    try { showAlarm(await api("/api/alarm/status")); } catch (e) { /* 연결 끊김은 이벤트 루프가 표시 */ }
+    await sleep(5000);
+  }
+}
+
+// ---------- 3) 귀가 집사 ----------
+const motion = { on: false, stream: null, prev: null, timer: null, lastSent: 0 };
+async function arrive(source) {
+  try { const j = await api("/api/arrival", { source }); if (j.cooldown) $("motionInfo").textContent = "최근에 이미 인사했어요 (쿨다운)"; }
+  catch (e) { log(e.message); }
+}
+$("homeBtn").onclick = () => { unlockAudio(); arrive("button"); };
+$("motionBtn").onclick = async () => {
+  if (motion.on) {
+    motion.on = false; clearInterval(motion.timer); stopStream(motion.stream); motion.stream = null; motion.prev = null;
+    $("motionVideo").style.display = "none"; $("motionBtn").textContent = "현관 모션 감지 켜기"; return;
+  }
+  try { motion.stream = await openCamera($("motionVideo"), "environment"); } catch (e) { return log("카메라 실패: " + e.message); }
+  motion.on = true; $("motionBtn").textContent = "모션 감지 끄기";
+  const th = (state.cfg && state.cfg.motion) || { threshold: 18, min_changed_ratio: 0.08 };
+  motion.timer = setInterval(() => {
+    const c = snapshot($("motionVideo"), 32); const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+    const gray = new Uint8Array(d.length / 4); for (let i = 0; i < gray.length; i++) gray[i] = (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) / 3;
+    if (motion.prev) {
+      let changed = 0; for (let i = 0; i < gray.length; i++) if (Math.abs(gray[i] - motion.prev[i]) > th.threshold) changed++;
+      const ratio = changed / gray.length; $("motionInfo").textContent = "변화량 " + (ratio * 100).toFixed(1) + "%";
+      if (ratio > th.min_changed_ratio && Date.now() - motion.lastSent > 15000) { motion.lastSent = Date.now(); arrive("motion"); }
+    }
+    motion.prev = gray;
+  }, 700);
+};
+</script>
+</body>
+</html>

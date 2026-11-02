@@ -1,0 +1,21 @@
+{
+  "title": "house-detective",
+  "project": "..",
+  "width": 84,
+  "height": 20,
+  "steps": [
+    {
+      "type": "comment",
+      "text": "# 탐정 보고서와 분리배출 판정"
+    },
+    {
+      "type": "cmd",
+      "run": "python -m housedet --home /tmp/hd-demo recycle 치킨 뼈",
+      "show": "house-detective recycle 치킨 뼈"
+    },
+    {
+      "type": "pause",
+      "seconds": 1.0
+    }
+  ]
+}

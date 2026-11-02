@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "house-detective"
+version = "0.1.0"
+description = "냉장고 유통기한 탐정과 재활용 분리 심판"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+house-detective = "housedet.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["housedet", "housedet.*"]
+
+[tool.setuptools.package-data]
+housedet = ["data/*.json"]

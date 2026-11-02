@@ -23,8 +23,10 @@ python -m gmtrpg play --world mydungeon --backend anthropic --model <모델명>
 
 ### 웹 UI
 ```bash
-python -m gmtrpg serve --world mydungeon          # http://127.0.0.1:8765
+python -m gmtrpg serve --world mydungeon          # http://127.0.0.1:8766
 ```
+기본 포트 변경됨: 8765→8766 (s21-sidekick과 충돌 방지)
+
 채팅 + 상태 패널(위치, NPC, 소지품, 퀘스트, 지도). 기본은 127.0.0.1에만 바인딩됩니다(인증 없음, 외부 공개 비권장).
 
 공통 옵션: `--dir worlds`(세계 DB 폴더), `--seed N`(주사위 시드), `--recent-turns 6`.

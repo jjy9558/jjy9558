@@ -87,5 +87,5 @@ def make_handler(gm, lock):
     return Handler
 
 
-def make_server(gm, host="127.0.0.1", port=8765):
+def make_server(gm, host="127.0.0.1", port=8766):
     return ThreadingHTTPServer((host, port), make_handler(gm, threading.Lock()))

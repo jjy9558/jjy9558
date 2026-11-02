@@ -11,7 +11,7 @@ DEFAULTS = {
     "data_dir": "~/.objmem/data",
     "token": "",                # 또는 환경변수 OBJMEM_TOKEN
     "host": "127.0.0.1",
-    "port": 8787,
+    "port": 8788,
     "max_frame_bytes": 6 * 1024 * 1024,
     "hash_threshold": 4,        # 8x8 평균 해시 해밍 거리 <= 이면 거의 같은 프레임으로 보고 건너뜀
     "photo_days": 7,

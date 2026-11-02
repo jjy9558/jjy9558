@@ -1,3 +1,4 @@
+import inspect
 import json
 import threading
 import unittest
@@ -5,7 +6,7 @@ import urllib.request
 import urllib.error
 
 from gmtrpg import context as ctx
-from gmtrpg.cli import run_wizard
+from gmtrpg.cli import build_parser, run_wizard
 from gmtrpg.dice import Dice
 from gmtrpg.engine import GameMaster
 from gmtrpg.llm import AnthropicLLM, FakeLLM, OpenAICompatLLM
@@ -341,6 +342,13 @@ class WebTests(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as c:
             self.opener.open(self.base + "/nope")
         self.assertEqual(c.exception.code, 404)
+
+
+class DefaultPortTests(unittest.TestCase):
+    def test_serve_default_port_is_8766(self):
+        args = build_parser().parse_args(["serve", "--world", "w"])
+        self.assertEqual(args.port, 8766)
+        self.assertEqual(inspect.signature(make_server).parameters["port"].default, 8766)
 
 
 if __name__ == "__main__":

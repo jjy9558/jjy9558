@@ -24,6 +24,7 @@ class CliTest(unittest.TestCase, helpers.TmpCase):
         cfg = json.load(open(conf))
         self.assertGreaterEqual(len(cfg["token"]), 20)
         self.assertEqual(cfg["host"], "127.0.0.1")
+        self.assertEqual(cfg["port"], 8788)
         self.assertEqual(cfg["base_url"], "http://127.0.0.1:8080/v1")
         cfg["data_dir"] = os.path.join(tmp, "d")
         json.dump(cfg, open(conf, "w"))

@@ -35,19 +35,21 @@
 cd object-memory
 python3 -m objmem config --init          # ~/.objmem/config.json 생성 (랜덤 토큰 포함)
 llama-server -m model.gguf --mmproj mmproj.gguf --port 8080     # 비전 모델 (별도 실행)
-python3 -m objmem serve                  # http://127.0.0.1:8787/
+python3 -m objmem serve                  # http://127.0.0.1:8788/
 python3 -m objmem ask "리모컨 어디 뒀지?"
 ```
 
+기본 포트 변경됨: 8787→8788 (voice-journal과 충돌 방지)
+
 ### 폰 페이지
 
-폰에서 `http://<PC>:8787/#token=<토큰>` 을 열면 토큰은 폰 localStorage 에 저장되고 주소창에서 지워집니다.
+폰에서 `http://<PC>:8788/#token=<토큰>` 을 열면 토큰은 폰 localStorage 에 저장되고 주소창에서 지워집니다.
 카메라 이름(거실, 책상 …)과 간격(분)을 정하고 **시작**. 화면 켜짐 유지(Wake Lock), **일시정지**(카메라까지 끔), 마지막 업로드 시각 표시가 있습니다.
 
 `getUserMedia` 는 **HTTPS 또는 localhost** 에서만 동작합니다. 방법 (s21-sidekick README와 같은 요령):
 
-1. **adb reverse (가장 간단)**: PC에 USB로 연결 후 `adb reverse tcp:8787 tcp:8787`, 폰에서 `http://localhost:8787/#token=...`. 서버는 `127.0.0.1` 그대로.
-2. **Tailscale HTTPS**: `tailscale serve --bg --https=443 http://127.0.0.1:8787` → `https://<pc>.<tailnet>.ts.net/#token=...`
+1. **adb reverse (가장 간단)**: PC에 USB로 연결 후 `adb reverse tcp:8788 tcp:8788`, 폰에서 `http://localhost:8788/#token=...`. 서버는 `127.0.0.1` 그대로.
+2. **Tailscale HTTPS**: `tailscale serve --bg --https=443 http://127.0.0.1:8788` → `https://<pc>.<tailnet>.ts.net/#token=...`
 3. **Chrome 플래그(테스트용)**: `chrome://flags/#unsafely-treat-insecure-origin-as-secure` 에 주소 등록, 서버 `--host`를 Tailscale IP로.
 
 ### 폰에서 동기화한 사진 가져오기
@@ -101,7 +103,7 @@ python3 -m objmem ask "어제 택배 상자 어디 놨더라" --json
 
 ## 설정 (`~/.objmem/config.json`, `OBJMEM_CONFIG`/`--config`, 토큰은 `OBJMEM_TOKEN` 으로도)
 
-`base_url, model, api_key, vlm_timeout, data_dir, token, host(127.0.0.1), port(8787), max_frame_bytes(6MB), hash_threshold(4), photo_days, desc_days, privacy_hours, stale_hours, llm_phrase, use_fts`
+`base_url, model, api_key, vlm_timeout, data_dir, token, host(127.0.0.1), port(8788), max_frame_bytes(6MB), hash_threshold(4), photo_days, desc_days, privacy_hours, stale_hours, llm_phrase, use_fts`
 
 ## HTTP API
 
@@ -132,7 +134,7 @@ python3 -m objmem ask "어제 택배 상자 어디 놨더라" --json
              data = json.loads((self.opener or urllib.request.urlopen)(req, timeout=30).read())
              return {"text": data["answer"], "summary": data["answer"][:300]}
      ```
-     `build_handlers` 에 `h.get("memory.ask")` 가 `url`+`token` 을 가질 때만 등록하고, 워커 설정에 `"handlers": {"memory.ask": {"url": "http://127.0.0.1:8787", "token": "..."}}` 와 caps `memory` 를 둡니다 (`token` 은 환경변수로 읽는 방식을 권장).
+     `build_handlers` 에 `h.get("memory.ask")` 가 `url`+`token` 을 가질 때만 등록하고, 워커 설정에 `"handlers": {"memory.ask": {"url": "http://127.0.0.1:8788", "token": "..."}}` 와 caps `memory` 를 둡니다 (`token` 은 환경변수로 읽는 방식을 권장).
   2. `intents.py` 규칙에 "어디 (뒀|놨|있)" 패턴 → `{type: "memory.ask", payload: {q: 발화}, notify: say}` 를 추가하면 "자비스, 리모컨 어디 뒀지?" 가 작업 → 완료 시 폰이 `answer` 를 읽어 줍니다.
   3. 질의 서버(objmem)는 사진이 있는 PC에만 두고, 허브는 tailnet 안에서 그 PC 워커에게 작업을 넘기면 됩니다.
 

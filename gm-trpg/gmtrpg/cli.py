@@ -101,7 +101,7 @@ def build_parser():
         s.add_argument("--recent-turns", type=int, default=6)
         if name == "serve":
             s.add_argument("--host", default="127.0.0.1")
-            s.add_argument("--port", type=int, default=8765)
+            s.add_argument("--port", type=int, default=8766)
     return p
 
 

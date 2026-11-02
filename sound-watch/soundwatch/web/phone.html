@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sound-watch 마이크</title>
+<style>
+:root{--bg:#fff;--fg:#1c2330;--muted:#5b6575;--line:#d5dae3;--panel:#f5f7fa;--ok:#1a7f45;--bad:#c0392b;--accent:#2b6cdf}
+@media (prefers-color-scheme:dark){:root{--bg:#10141b;--fg:#e6e9ef;--muted:#9aa5b6;--line:#2c3441;--panel:#171c25;--ok:#4cc380;--bad:#ff7a6b;--accent:#6ea2ff}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,"Malgun Gothic","Noto Sans KR",sans-serif}
+main{max-width:520px;margin:0 auto;padding:16px}
+h1{font-size:1.25rem;margin:.2em 0 .6em}
+button{font:inherit;padding:14px 18px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--fg);width:100%}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+button.stop{background:var(--bad);border-color:var(--bad);color:#fff;font-weight:700}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:12px 0}
+.meter{height:14px;background:var(--line);border-radius:7px;overflow:hidden}.meter>div{height:100%;width:0;background:var(--ok);transition:width .15s}
+.row{display:flex;justify-content:space-between;gap:8px;font-size:.92rem}.muted{color:var(--muted)}
+.warn{border-left:4px solid #e0a100}.err{color:var(--bad)}
+ul{margin:.3em 0;padding-left:1.1em}input{font:inherit;width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+</style>
+</head>
+<body>
+<main>
+<h1>sound-watch 마이크</h1>
+<div class="card warn muted" id="secure" hidden>이 주소는 보안 연결(HTTPS 또는 localhost)이 아니라 마이크를 쓸 수 없습니다. README의 'S21에서 열기'를 참고하세요.</div>
+<div class="card" id="tokenCard" hidden>
+  <label for="tokenIn">토큰 (PC 콘솔에 표시된 값)</label>
+  <input id="tokenIn" type="password" autocomplete="off">
+</div>
+<button id="startBtn" class="primary">시작</button>
+<div class="card">
+  <div class="row"><span>상태</span><b id="state">대기</b></div>
+  <div class="row"><span>폰 입력 레벨</span><span id="localDb">-</span></div>
+  <div class="meter"><div id="bar"></div></div>
+  <div class="row" style="margin-top:8px"><span>PC가 계산한 레벨</span><span id="serverDb">-</span></div>
+  <div class="row"><span>전송 / 실패 / 대기</span><span id="counts">0 / 0 / 0</span></div>
+</div>
+<div class="card"><b>최근 인식</b><ul id="recent"><li class="muted">아직 없음</li></ul></div>
+<div class="card muted" style="font-size:.85rem">
+  충전기에 꽂고 화면을 켠 채 두세요(화면 켜짐 유지를 요청합니다). 에코 제거·잡음 억제·자동 이득은 끄고 녹음하지만,
+  기기에 따라 완전히 꺼지지 않을 수 있습니다. 소음 측정값은 보정 전에는 상대값입니다.
+</div>
+</main>
+<script>
+(function(){
+"use strict";
+var $ = function(id){return document.getElementById(id);};
+var TARGET = 16000, MAX_QUEUE = 30;
+var token = "";
+try {
+  var m = /[#&]token=([^&]+)/.exec(location.hash);
+  if (m) { token = decodeURIComponent(m[1]); try{localStorage.setItem("sw_token", token);}catch(e){} history.replaceState(null, "", location.pathname + location.search); }
+  else { try{ token = localStorage.getItem("sw_token") || ""; }catch(e){} }
+} catch(e) {}
+if (!token) { $("tokenCard").hidden = false; }
+$("tokenIn").addEventListener("change", function(){ token = $("tokenIn").value.trim(); try{localStorage.setItem("sw_token", token);}catch(e){} });
+if (!window.isSecureContext) { $("secure").hidden = false; }
+
+var S = window.__sw = {sent:0, failed:0, queue:0, running:false, rmsDb:null, serverDb:null};
+var ctx = null, stream = null, node = null, wake = null, pending = [], pendingLen = 0, queue = [], sending = false;
+var seq = 0, session = Math.random().toString(36).slice(2, 10), pollTimer = null;
+
+function setState(t, bad){ var e=$("state"); e.textContent=t; e.className = bad ? "err" : ""; }
+function counts(){ S.queue = queue.length; $("counts").textContent = S.sent + " / " + S.failed + " / " + queue.length; }
+
+function toInt16(f32){
+  var n = f32.length, out = new Int16Array(n), sum = 0;
+  for (var i=0;i<n;i++){ var v = Math.max(-1, Math.min(1, f32[i])); sum += v*v; out[i] = v < 0 ? v*32768 : v*32767; }
+  var rms = Math.sqrt(sum/Math.max(1,n)); var db = rms > 0 ? 20*Math.log10(rms) : -120;
+  return {pcm: out, db: db};
+}
+function resampleTo16k(f32, sr){
+  if (sr === TARGET) return f32;
+  var ratio = sr / TARGET, n = Math.floor(f32.length / ratio), out = new Float32Array(n);
+  for (var k=0;k<n;k++){
+    var a = Math.floor(k*ratio), b = Math.max(a+1, Math.floor((k+1)*ratio)), s = 0;
+    for (var i=a;i<b && i<f32.length;i++) s += f32[i];
+    out[k] = s / (b - a);
+  }
+  return out;
+}
+function onSamples(block){
+  pending.push(new Float32Array(block)); pendingLen += block.length;
+  var need = ctx.sampleRate;               // 정확히 1초 분량
+  if (pendingLen >= need){
+    var all = new Float32Array(pendingLen), o = 0;
+    for (var i=0;i<pending.length;i++){ all.set(pending[i], o); o += pending[i].length; }
+    var chunk = all.subarray(0, need), rest = all.subarray(need);
+    pending = rest.length ? [new Float32Array(rest)] : []; pendingLen = rest.length;
+    var r = toInt16(resampleTo16k(chunk, ctx.sampleRate));
+    S.rmsDb = r.db;
+    $("localDb").textContent = r.db.toFixed(1) + " dBFS";
+    $("bar").style.width = Math.max(0, Math.min(100, (r.db + 90) / 90 * 100)) + "%";
+    if (queue.length >= MAX_QUEUE) queue.shift();
+    queue.push({seq: seq++, pcm: r.pcm}); counts(); pump();
+  }
+}
+function pump(){
+  if (sending || !queue.length || !S.running) return;
+  sending = true;
+  var item = queue[0];
+  fetch("/api/audio?session=" + session + "&seq=" + item.seq + "&sr=" + TARGET, {
+    method: "POST", headers: {"X-SoundWatch-Token": token, "Content-Type": "application/octet-stream"}, body: item.pcm.buffer
+  }).then(function(r){
+    if (r.status === 401){ throw new Error("토큰이 틀립니다"); }
+    if (!r.ok){ throw new Error("서버 응답 " + r.status); }
+    return r.json();
+  }).then(function(j){
+    queue.shift(); S.sent++; sending = false; S.serverDb = j.level_db;
+    $("serverDb").textContent = j.level_db.toFixed(1) + " dB";
+    setState("전송 중"); counts(); pump();
+  }).catch(function(e){
+    S.failed++; sending = false; setState("전송 실패: " + e.message + " (재시도)", true); counts();
+    setTimeout(pump, 2000);
+  });
+}
+function poll(){
+  fetch("/api/status", {headers: {"X-SoundWatch-Token": token}}).then(function(r){return r.ok ? r.json() : null;}).then(function(j){
+    if (!j) return;
+    var ul = $("recent"); ul.innerHTML = "";
+    var items = (j.recent || []).slice(-8).reverse();
+    if (!items.length){ var li0 = document.createElement("li"); li0.className="muted"; li0.textContent="아직 없음"; ul.appendChild(li0); }
+    items.forEach(function(d){ var li = document.createElement("li"); li.textContent = d.name + " — " + d.message; ul.appendChild(li); });
+  }).catch(function(){});
+}
+async function requestWake(){ try{ if (navigator.wakeLock) wake = await navigator.wakeLock.request("screen"); }catch(e){} }
+document.addEventListener("visibilitychange", function(){ if (S.running && document.visibilityState === "visible") requestWake(); });
+
+var WORKLET = "class SwCapture extends AudioWorkletProcessor{process(inputs){var c=inputs[0]&&inputs[0][0];if(c&&c.length){this.port.postMessage(c);}return true;}}registerProcessor('sw-capture',SwCapture);";
+async function start(){
+  if (!token){ setState("토큰을 입력하세요", true); return; }
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation:false, noiseSuppression:false, autoGainControl:false, channelCount:1}});
+  }catch(e){ setState("마이크 권한 실패: " + e.message, true); return; }
+  var AC = window.AudioContext || window.webkitAudioContext;
+  try{ ctx = new AC({sampleRate: TARGET}); }catch(e){ ctx = new AC(); }
+  var src = ctx.createMediaStreamSource(stream);
+  var sink = ctx.createGain(); sink.gain.value = 0; sink.connect(ctx.destination);
+  if (ctx.audioWorklet && window.Blob){
+    try{
+      var url = URL.createObjectURL(new Blob([WORKLET], {type: "application/javascript"}));
+      await ctx.audioWorklet.addModule(url);
+      node = new AudioWorkletNode(ctx, "sw-capture");
+      node.port.onmessage = function(ev){ onSamples(ev.data); };
+    }catch(e){ node = null; }
+  }
+  if (!node){
+    node = ctx.createScriptProcessor(4096, 1, 1);
+    node.onaudioprocess = function(ev){ onSamples(ev.inputBuffer.getChannelData(0)); };
+  }
+  src.connect(node); node.connect(sink);
+  S.running = true; seq = 0; session = Math.random().toString(36).slice(2, 10);
+  $("startBtn").textContent = "중지"; $("startBtn").className = "stop"; setState("듣는 중 (" + ctx.sampleRate + " Hz)");
+  requestWake(); pollTimer = setInterval(poll, 3000);
+}
+function stop(){
+  S.running = false;
+  try{ if (node) node.disconnect(); }catch(e){}
+  try{ if (stream) stream.getTracks().forEach(function(t){t.stop();}); }catch(e){}
+  try{ if (ctx) ctx.close(); }catch(e){}
+  try{ if (wake) wake.release(); }catch(e){}
+  clearInterval(pollTimer); node = null; ctx = null; pending = []; pendingLen = 0;
+  $("startBtn").textContent = "시작"; $("startBtn").className = "primary"; setState("중지됨");
+}
+$("startBtn").addEventListener("click", function(){ if (S.running) stop(); else start(); });
+})();
+</script>
+</body>
+</html>

@@ -28,6 +28,8 @@ Claude Code로 만든 개인 도구 프로젝트들이 모여 있는 곳입니�
 | [game-diary](game-diary/) | 게임 스크린샷 AI 앨범·일기 (로컬 비전 모델) | v0.1 |
 | [shorts-linter](shorts-linter/) | 쇼츠 업로드 전 검사기: 길이·비율·음량·무음·자막·메타데이터·제목 약속 일치 | v0.1 |
 | [demo-maker](demo-maker/) | CLI 터미널 데모 애니메이션 SVG + README 사용법 자동 생성 | v0.1 |
+| [object-memory](object-memory/) | 현실판 Screenpipe: S21이 찍은 방 사진으로 "리모컨 어디 뒀지?" 답하기 (로컬 전용) | v0.1 |
+| [sound-watch](sound-watch/) | 소리 알림이(초인종·세탁기·밥솥 등) + 층간소음 기록·리포트 | v0.1 |
 
 ## 테스트
 

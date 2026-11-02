@@ -1,0 +1,22 @@
+[project]
+name = "sound-watch"
+version = "0.1.0"
+description = "집 안 소리 이벤트 알림 + 층간소음 증거 리포트 (표준 라이브러리 중심)"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.optional-dependencies]
+fast = ["numpy"]
+
+[project.scripts]
+soundwatch = "soundwatch.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["soundwatch"]
+
+[tool.setuptools.package-data]
+soundwatch = ["web/*.html"]

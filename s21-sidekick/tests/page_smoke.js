@@ -1,7 +1,7 @@
 // 사용법: node page_smoke.js <base_url> <token>  (test_page_smoke.py가 호출)
 const { chromium } = require("playwright");
 (async () => {
-  const [base, token] = process.argv.slice(2);
+  const [base, token, nfcKey] = process.argv.slice(2);
   const browser = await chromium.launch({ args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] });
   const page = await browser.newPage();
   const errors = [];
@@ -40,6 +40,24 @@ const { chromium } = require("playwright");
   await page.click('#stadium button[data-ev="pr_merged"]');
   await page.waitForSelector("#fx .big", { timeout: 8000 });
   await page.waitForFunction(() => document.getElementById("lastSay").textContent.includes("머지"), null, { timeout: 15000 });
+  // 매크로 패드: 탭의 버튼 -> 가짜 launch 동작 / confirm 매크로는 대화상자 수락 후 실행
+  await page.click('nav button[data-tab="macro"]');
+  await page.waitForSelector('#macroGrid button[data-macro="smoke"]', { timeout: 8000 });
+  await page.click('#macroGrid button[data-macro="smoke"]');
+  await page.waitForFunction(() => document.getElementById("macroResult").textContent.includes("✅"), null, { timeout: 8000 });
+  const macroTab = await page.textContent("#macroResult");
+  page.once("dialog", (d) => d.accept());
+  await page.click('#macroGrid button[data-macro="smoke_confirm"]');
+  await page.waitForFunction(() => document.getElementById("macroResult").textContent.includes("Confirmed"), null, { timeout: 8000 });
+  // NFC: 메인 토큰 없는 새 컨텍스트에서 #macro=<id>&nfc=<키> 로 열면 그 매크로만 실행되고 주소창에서 키가 사라진다
+  const ctx2 = await browser.newContext();
+  const nfcPage = await ctx2.newPage();
+  nfcPage.on("pageerror", (e) => errors.push("nfc pageerror: " + e.message));
+  await nfcPage.goto(base + "/#macro=smoke_nfc&nfc=" + nfcKey);
+  await nfcPage.waitForFunction(() => document.getElementById("macroResult").textContent.includes("✅"), null, { timeout: 8000 });
+  const nfcUrl = nfcPage.url();
+  const nfcStored = await nfcPage.evaluate(() => JSON.stringify(localStorage));
+  await ctx2.close();
   // 결재: 파이썬 쪽이 이 신호를 보고 진짜 훅을 실행한다 -> 카드가 뜨면 승인
   console.log("READY_FOR_APPROVAL");
   await page.waitForSelector("#approval.on", { timeout: 20000 });
@@ -49,5 +67,5 @@ const { chromium } = require("playwright");
   await page.waitForSelector("#approval", { state: "hidden", timeout: 8000 });
   const logText = await page.textContent("#log");
   await browser.close();
-  console.log(JSON.stringify({ errors, said, checklist, apprLabel, apprCmd, log: logText }));
+  console.log(JSON.stringify({ errors, said, checklist, apprLabel, apprCmd, macroTab, nfcUrl, nfcStored, log: logText }));
 })().catch((e) => { console.log(JSON.stringify({ errors: ["fatal: " + e.message] })); process.exit(0); });

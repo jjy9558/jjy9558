@@ -3,6 +3,7 @@ import datetime as dt
 import io
 import json
 import os
+import secrets
 import shutil
 import subprocess
 import threading
@@ -30,18 +31,28 @@ def _playwright_available():
 @unittest.skipUnless(_playwright_available(), "node playwright 없음")
 class PageSmokeTest(unittest.TestCase):
     def test_page_loads_and_round_trips(self):
+        nfc_key = secrets.token_urlsafe(24)  # 런타임 생성 (고정 비밀값을 픽스처에 두지 않음)
         cfg = config(debugger={"mode": "command", "command": ["x"]},
                      butler={"providers": [{"name": "greeting", "text": "어서 와요."}]},
                      departure={"providers": [{"name": "reminders", "items": ["지갑", "우산"]}]},
-                     approval={"timeout_seconds": 30})
+                     approval={"timeout_seconds": 30},
+                     macro={"min_interval_seconds": 0, "items": [
+                         {"id": "smoke", "label": "Smoke", "emoji": "🧪", "color": "#8bd", "type": "launch",
+                          "program": "fake-program", "args": ["--smoke"]},
+                         {"id": "smoke_confirm", "label": "Confirmed", "type": "launch", "program": "fake-program",
+                          "confirm": True},
+                         {"id": "smoke_nfc", "label": "NfcTag", "type": "launch", "program": "fake-program",
+                          "nfc_key": nfc_key}]})
+        launched = []
         app = Sidekick(cfg, clock=FakeClock(dt.datetime(2026, 11, 2, 12, 0)),
                        runner=lambda argv, cwd=None, timeout=None: (0, "가짜 요약입니다."),
-                       spawn=lambda fn, *a: fn(*a))
+                       spawn=lambda fn, *a: fn(*a),
+                       macro_launcher=lambda argv, cwd=None: launched.append(argv))
         srv = make_server(app, "127.0.0.1", 0, quiet=True)
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         try:
             base = "http://127.0.0.1:%d" % srv.server_address[1]
-            proc = subprocess.Popen(["node", os.path.join(HERE, "page_smoke.js"), base, "secret-token"],
+            proc = subprocess.Popen(["node", os.path.join(HERE, "page_smoke.js"), base, "secret-token", nfc_key],
                                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
             hook_result = {}
 
@@ -71,6 +82,11 @@ class PageSmokeTest(unittest.TestCase):
             self.assertNotIn("소리 실패", res["log"])
             self.assertEqual(res["checklist"], ["챙기세요: 지갑, 우산."])
             self.assertEqual((res["apprLabel"], res["apprCmd"]), ("강제 재귀 삭제", "rm -rf ./build"))
+            self.assertEqual(launched, [["fake-program", "--smoke"], ["fake-program"], ["fake-program"]])
+            self.assertIn("Smoke", res["macroTab"])
+            self.assertNotIn(nfc_key, res["nfcUrl"])
+            self.assertNotIn(nfc_key, res["nfcStored"])
+            self.assertEqual([e["source"] for e in app.macros.recent_audit()][:1], ["nfc"])
             self.assertIsNotNone(hook_thread)
             hook_thread.join(15)
             self.assertEqual(hook_result.get("code"), 0, hook_result)

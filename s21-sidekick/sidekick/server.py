@@ -13,6 +13,7 @@ from .butler import Butler
 from .debugger import Debugger, default_runner
 from .departure import Departure
 from .events import EventQueue
+from .macro import MacroPad
 from .llm import client_from_config
 from .relay import Forwarder, clean_module, clean_say_text, forward_types, validate_event
 from .stadium import RateLimiter, Stadium
@@ -29,7 +30,8 @@ class Sidekick:
 
     def __init__(self, cfg, llm=None, vision=None, clock=None, runner=default_runner,
                  spawn=_spawn_thread, transcriber=None, monotonic=None, rng=None,
-                 departure_registry=None, forward_post=None):
+                 departure_registry=None, forward_post=None,
+                 macro_launcher=None, macro_opener=None, macro_keys=None, macro_sleep=None):
         self.cfg = cfg
         self.events = EventQueue()
         self.debugger = Debugger(cfg["debugger"], llm=llm, runner=runner)
@@ -47,6 +49,32 @@ class Sidekick:
         self.forward_limiter = RateLimiter(30, 0.5, **mono)
         self.spawn = spawn
         self.transcriber = transcriber
+        mk = {k: v for k, v in (("launcher", macro_launcher), ("opener", macro_opener),
+                                ("key_sender", macro_keys), ("sleep", macro_sleep)) if v is not None}
+        self.macros = MacroPad(cfg["macro"], clock=clock, monotonic=monotonic, internal={
+            "departure": self._macro_departure, "arrival": self._macro_arrival,
+            "stadium": self._macro_stadium}, **mk)
+
+    # ---- 매크로 패드가 재사용하는 내부 동작 (config에 적힌 것만 호출됨) ----
+    def _macro_departure(self, item):
+        r = self.departure.leave(source="button")
+        if r.get("say"):
+            self.events.say(r["say"], module="departure")
+        return r
+
+    def _macro_arrival(self, item):
+        r = self.butler.arrive(source="button")
+        if r.get("say"):
+            self.events.say(r["say"], module="butler")
+        return r
+
+    def _macro_stadium(self, item):
+        r = self.stadium.notify(item["event"], item.get("detail") or "")
+        if r.get("rate_limited"):
+            return {"ok": False, "error": "관중석 레이트 리밋"}
+        if r.get("ok"):
+            self.events.push("stadium", r["say"], sound=r["sound"], emoji=r["emoji"], event=r["event"])
+        return r
 
     @classmethod
     def from_config(cls, cfg, **kw):
@@ -138,6 +166,8 @@ class Handler(BaseHTTPRequestHandler):
         if not path.startswith("/api/"):
             return self._send(404, {"error": "not found"})
         if not self._authorized():
+            if (method, path) == ("POST", "/api/macro"):  # NFC 키는 이 경로에서만, 해당 매크로 하나에만 통한다
+                return self._macro_nfc()
             return self._send(401, {"error": "토큰이 없거나 틀렸습니다"})
         route = ROUTES.get((method, path))
         if not route:
@@ -157,6 +187,7 @@ class Handler(BaseHTTPRequestHandler):
     def r_config(self, q):
         c = self.app.cfg
         return 200, {"alarm": self.app.alarm.status(),
+                     "macros": self.app.macros.public_list() if self.app.macros.enabled else [],
                      "motion": c["butler"]["motion"],
                      "triggers": c["debugger"]["triggers"],
                      "vision": bool(self.app.alarm.vision),
@@ -248,6 +279,48 @@ class Handler(BaseHTTPRequestHandler):
         self.app.spawn(self.app.forwarder.send, kind, n)
         return 200, {"ok": True, "forwarded": len(self.app.forwarder.targets_for(kind)), "type": kind}
 
+    # ---- 매크로 패드 ----
+    def _macro_nfc(self):
+        """메인 토큰 없이 온 /api/macro: 헤더의 값이 body.id 매크로의 nfc_key일 때만 통과."""
+        key = (self.headers.get("X-Sidekick-Token") or "").strip()
+        try:
+            b = self._json()
+            mid = b.get("id")
+        except ValueError:
+            return self._send(401, {"error": "토큰이 없거나 틀렸습니다"})
+        if not self.app.macros.nfc_ok(mid, key):
+            self.app.macros.log(mid if isinstance(mid, str) else "?", "nfc", "denied")
+            return self._send(401, {"error": "토큰이 없거나 틀렸습니다"})
+        try:
+            code, body = self._macro_run(b, "nfc")
+        except Exception as e:
+            code, body = 500, {"error": "서버 오류: %s" % type(e).__name__}
+        self._send(code, body)
+
+    def _macro_run(self, b, source):
+        mid = b.get("id")
+        if not isinstance(mid, str) or not mid:
+            raise ValueError("id가 필요합니다")
+        try:
+            r = self.app.macros.run(mid, source=source, confirmed=b.get("confirmed") is True)
+        except KeyError:
+            self.app.macros.log(mid[:60], source, "unknown")
+            return 404, {"error": "그런 매크로가 없습니다"}
+        if r.get("disabled"):
+            return 403, r
+        if r.get("rate_limited"):
+            return 429, dict(r, error="너무 자주 눌렀어요")
+        if not r["ok"] and not r.get("needs_confirm"):
+            return 502, r
+        return 200, r
+
+    def r_macro(self, q):
+        return self._macro_run(self._json(), "tab")  # 메인 토큰으로 온 요청은 항상 tab
+
+    def r_macro_audit(self, q):
+        n = max(1, min(int((q.get("n") or ["50"])[0]), 200))
+        return 200, {"audit": self.app.macros.recent_audit(n)}
+
     # ---- 현관 출발 체크 ----
     def r_departure(self, q):
         source = str(self._json().get("source") or "button")
@@ -323,6 +396,8 @@ ROUTES = {
     ("POST", "/api/say"): Handler.r_say,
     ("POST", "/api/phone_event"): Handler.r_phone_event,
     ("POST", "/api/notify"): Handler.r_notify,
+    ("POST", "/api/macro"): Handler.r_macro,
+    ("GET", "/api/macro/audit"): Handler.r_macro_audit,
     ("POST", "/api/approval/request"): Handler.r_approval_request,
     ("GET", "/api/approval/wait"): Handler.r_approval_wait,
     ("POST", "/api/approval/decide"): Handler.r_approval_decide,

@@ -92,6 +92,16 @@ DEFAULTS = {
     # 선택(기본 꺼짐): 폰 버튼 이벤트를 다른 로컬 프로그램으로 전달.
     # 예: [{"url": "http://127.0.0.1:8799/api/event", "token_env": "NAGGER_EVENTS_TOKEN", "types": ["sigh"]}]
     "forward_events": [],
+    # 매크로 패드: 폰 버튼/NFC 태그 -> POST /api/macro {"id"} -> PC가 *여기 적힌* 동작만 실행. 자세한 형식은 README.
+    "macro": {
+        "enabled": True,
+        "max_per_minute": 20,
+        "min_interval_seconds": 0.5,
+        "max_chain": 8,
+        "audit_keep": 200,   # 메모리에 남기는 감사 로그 수
+        "audit_file": "",    # 비우면 파일 저장 안 함. 경로를 주면 JSON Lines로 덧붙임
+        "items": [],
+    },
     "stt": {"model": "small", "device": "auto", "compute_type": "default", "language": "ko"},
 }
 
@@ -129,6 +139,8 @@ def validate(cfg):
         problems.append("debugger.mode는 'log_tail' 또는 'command'여야 합니다.")
     if cfg["approval"]["on_timeout"] not in ("deny", "ask"):
         problems.append("approval.on_timeout은 'deny' 또는 'ask'여야 합니다.")
+    from .macro import validate_macros
+    problems += validate_macros(cfg["macro"], token)
     if problems:
         raise ConfigError("\n".join(problems))
     return cfg

@@ -7,7 +7,7 @@ S21이 듣고 보면  ──▶  PC가 판단  ──▶  S21이 말하거나 / 
  (마이크·카메라)       (트리거·LLM·VLM)     (TTS)          (미리 정한 명령)
 ```
 
-뼈대는 하나이고, 그 위에 모듈 여섯 개가 꽂혀 있습니다.
+뼈대는 하나이고, 그 위에 모듈 일곱 개가 꽂혀 있습니다.
 
 | 모듈 | 폰이 하는 일 | PC가 하는 일 |
 |---|---|---|
@@ -16,6 +16,7 @@ S21이 듣고 보면  ──▶  PC가 판단  ──▶  S21이 말하거나 / 
 | 귀가 집사 | 현관 움직임(또는 버튼)을 감지 → 요약을 읽어준다 | 일정·Claude 상태 등 provider 결과를 모은다 |
 | 현관 출발 체크 | "나 간다" 버튼/모션 → 체크리스트를 읽어준다 | 날씨·첫 일정·챙길 것·GPU 상태 provider를 모은다 |
 | 커밋 관중석 | 환호·야유·불꽃놀이 (Web Audio 합성) + 큰 이모지 | `git push`/CI/PR 머지 결과를 `notify`로 알린다 |
+| 매크로 패드 | 큰 버튼 격자(또는 NFC 태그)를 누른다 | config에 미리 적어 둔 프로그램 실행·URL 열기·키 입력·텍스트 입력만 한다 |
 | rm -rf 결재 보고 | "사장님, ... 해도 되겠습니까?" → 승인/반려 (버튼·음성) | Claude Code 훅이 위험 명령을 결재가 날 때까지 붙잡는다 |
 
 - PC: Python 3.9+, **표준 라이브러리만** (PC 음성 인식을 원할 때만 `faster-whisper` 선택 설치)
@@ -141,6 +142,53 @@ python -m sidekick notify pr_merged --detail "PR 12" --lines 840   # 불꽃놀�
   - 가장 단순하게는 `git push && python -m sidekick notify push_ok || python -m sidekick notify push_fail`
 - 관중석 탭의 테스트 버튼으로 소리를 미리 들어볼 수 있습니다 (레이트 리밋 적용).
 
+### 매크로 패드 (`macro`)
+
+폰을 PC용 단축키 패드로 씁니다. 폰 페이지의 **매크로** 탭에 큰 버튼 격자(라벨·이모지·색)가 뜨고, 누르면 `POST /api/macro {"id": "..."}`. **폰은 id만 보내고**, 실행할 프로그램·URL·키·글자는 전부 `config.json`의 `macro.items`에 있습니다 (폰이 보낸 글자는 절대 실행되지 않음). `config.example.json`에 예시가 있습니다.
+
+```json
+"macro": {
+  "max_per_minute": 20, "min_interval_seconds": 0.5, "max_chain": 8,
+  "audit_keep": 200, "audit_file": "",
+  "items": [
+    {"id": "vscode", "label": "VS Code", "emoji": "💻", "color": "#5aa9ff", "type": "launch",
+     "program": "C:/.../Code.exe", "args": ["C:/dev/myapp"]},
+    {"id": "playpause", "label": "재생/정지", "emoji": "⏯️", "type": "keys", "keys": "play/pause"},
+    {"id": "lock", "label": "화면 잠금", "type": "keys", "keys": "win+l", "confirm": true}
+  ]
+}
+```
+
+공통 필드: `id`(영문·숫자·`_-`, 중복 불가), `label`, `emoji`, `color`(`#rgb`/`#rrggbb`), `confirm`, `nfc_key`, `hidden`(격자에서 숨김, NFC 전용).
+
+| `type` | 필드 | 동작 |
+|---|---|---|
+| `launch` | `program`, `args`(문자열 목록), `cwd`? | 인자 목록 그대로 `subprocess.Popen(shell=False)`. 기다리지 않음 |
+| `url` | `url` (`http`/`https`/`steam`/`vscode`/`spotify`만) | 기본 브라우저/앱으로 열기 (`webbrowser`) |
+| `keys` | `keys` 예: `ctrl+shift+esc`, `win+d`, `alt+f4`, `play/pause`, `next`, `prev`, `volumeup`, `volumedown`, `mute` | 앞에 있는 창에 `SendInput`. 수정 키 `ctrl`/`alt`/`shift`/`win` + 키 1개(영문·숫자·`F1`~`F24`·방향키 등) |
+| `text` | `text` (최대 500자, 줄바꿈=Enter) | 유니코드(`KEYEVENTF_UNICODE`)로 타이핑. 한글·이모지 가능 |
+| `sidekick` | `action`: `departure`/`arrival`/`stadium`(+`event`) | 기존 모듈 재사용 (출발 체크·귀가 인사·관중석 연출) |
+| `chain` | `steps`: `["id", {"id": "다른id", "delay": 2}]` | 순서대로 실행. 한 단계 지연 최대 10초(합계 30초), 최대 `max_chain`단계. **체인 안에 체인·자기 자신은 금지**(시작 시 설정 검사에서 오류). 한 단계가 실패하면 거기서 멈춤 |
+
+- `keys`/`text`는 **Windows에서만** 동작합니다(`sidekick/winkeys.py`, ctypes). 다른 OS에서는 "Windows에서만 동작합니다" 오류를 돌려줍니다. 관리자 권한으로 뜬 창에는 일반 권한 서버가 키를 못 보낼 수 있습니다.
+- 설정이 틀리면(알 수 없는 type, 필수 필드 없음, 없는 id를 부르는 체인, 키 이름 오류 등) 서버가 시작 시 오류 목록을 내고 멈춥니다.
+- **확인 창**: `"confirm": true`인 매크로는 폰에서 확인 대화상자를 거쳐야 실행됩니다. 서버도 `confirmed: true` 없이는 실행하지 않습니다 (그래도 이건 *실수 방지*일 뿐 보안 장치가 아닙니다 — 토큰을 가진 사람은 `confirmed`를 직접 보낼 수 있음).
+- **레이트 리밋**: `max_per_minute`/`min_interval_seconds` 초과 시 429 (`retry_after`).
+- **감사 로그**: 시각·매크로 id·출처(`tab`/`nfc`/`chain:<id>`)·결과(`ok`/`error`/`needs_confirm`/`rate_limited`/`denied`/`unknown`)를 기록. 메모리에 최근 `audit_keep`개, `audit_file`을 지정하면 JSON Lines로도 덧붙입니다. 폰 매크로 탭의 "최근 실행 기록" 또는 `GET /api/macro/audit`(메인 토큰). 토큰·nfc_key·텍스트 내용은 기록하지 않습니다.
+
+#### NFC 태그로 실행하기
+
+태그 주소: `https://<pc이름>.<tailnet>.ts.net/#macro=<id>&nfc=<nfc_key>`
+
+**경고: 태그에 메인 토큰(`#token=...`)을 쓰지 마세요.** NFC 태그는 근처의 누구나(폰만 있으면) 읽을 수 있고, 메인 토큰은 PC의 모든 API를 엽니다. 대신 매크로마다 따로 만든 `nfc_key`를 씁니다.
+
+1. `python -m sidekick macro-key` 로 무작위 키를 만든다 (20자 이상 필수, 매크로마다 다르게, `server.token`과도 달라야 함).
+2. `config.json`의 해당 매크로에 `"nfc_key": "<키>"`를 넣고 서버를 다시 시작.
+3. 폰의 NFC 쓰기 앱(NFC Tools 등)으로 위 주소를 URL 레코드로 기록 (필요하면 태그를 읽기 전용으로 잠금).
+4. 태그에 폰을 대면 페이지가 열리고, 해시를 읽어 `POST /api/macro`를 `X-Sidekick-Token: <nfc_key>`로 호출한 뒤 결과를 보여 줍니다. 주소창의 키는 즉시 지워지고 폰에 저장하지 않습니다.
+
+`nfc_key`는 **그 매크로 하나에만** 유효합니다: 다른 매크로 id, 다른 `/api/*` 경로에는 401. 그래도 키가 읽히면 누구든 그 한 동작은 실행할 수 있으니 **태그에는 재생/정지·볼륨처럼 무해한 동작만** 연결하세요 (위험한 건 `confirm: true`로 두면 폰에서 확인을 거침). 취소(revoke)는 `nfc_key`를 지우거나 새 값으로 바꾸고 서버를 재시작 — 옛 태그는 즉시 401이 되고 감사 로그에 `denied`로 남습니다. 임시로 막으려면 `"nfc_enabled": false`.
+
 ### rm -rf 결재 보고
 Claude Code가 위험한 명령을 실행하려 하면 폰이 묻습니다: **"사장님, 강제 재귀 삭제: rm -rf ./build 해도 되겠습니까?"** 화면에는 큰 **승인 / 반려** 버튼과 명령 전체가 뜨고, 말로도 답할 수 있습니다 ("ㅇㅇ / 응 / 해 / 승인" ↔ "안 돼 / 아니 / 반려"; 반려 단어가 섞이면 반려 우선, 못 알아들으면 다시 물음 — 자동 승인은 없음).
 
@@ -230,6 +278,8 @@ Claude Code `settings.json` (사용자 `~/.claude/settings.json` 또는 프로�
 | GET | `/api/approval/wait?id=&wait=25` | 결재 결과 롱폴링: `pending`/`allow`/`deny`/`expired` |
 | POST | `/api/approval/decide {"id", "decision":"allow"\|"deny"}` 또는 `{"id", "utterance"}` | 폰의 승인/반려 (음성은 서버가 해석, 못 알아들으면 `understood:false`) |
 | GET | `/api/approval/pending` | 대기 중인 결재 (폰이 늦게 켜져도 보이게) |
+| POST | `/api/macro {"id", "confirmed"?}` | 매크로 실행. 메인 토큰 또는 그 매크로 전용 `nfc_key` (200 / `needs_confirm` / 404 / 429 / 502) |
+| GET | `/api/macro/audit?n=50` | 매크로 감사 로그 (메인 토큰만) |
 | POST | `/api/say {"text", "module"?}` | 외부 프로그램이 폰에 말 시키기 |
 | POST | `/api/phone_event {"type", "n"?}` | 폰 버튼 이벤트를 `forward_events`로 전달 |
 | GET | `/api/config`, `/api/ping` | 폰 페이지 초기화 / 연결 확인 |
@@ -240,6 +290,7 @@ Claude Code `settings.json` (사용자 `~/.claude/settings.json` 또는 프로�
 - **기본적으로 아무것도 저장하지 않습니다.** 사진은 판정 후 버려지고, PC 음성 인식 오디오는 임시 파일을 바로 지우며, 서버 접속 로그에는 경로만 남고 발화 내용은 남지 않습니다. 이벤트 큐(최근 100개 문장)는 메모리에만 있습니다.
 - 폰에서 온 글자는 **절대 명령으로 실행하지 않습니다.** 실행되는 건 `config.json`에 미리 적어 둔 명령뿐이고, 발화는 `shell=False`로 인자 하나 안의 데이터로만 들어갑니다 (`str.format`도 쓰지 않음).
 - 토큰은 상수 시간 비교, 요청 크기 제한(`server.max_body_mb`), 기본 바인딩은 localhost.
+- 매크로 패드: 폰은 id만 보내고 PC는 config의 동작만 실행합니다 (`launch`는 `shell=False` 인자 목록, `url`은 허용 스킴만). NFC 키는 매크로별 전용·취소 가능하며 다른 API엔 통하지 않습니다.
 - 결재 보고: 폰은 승인/반려만 표시할 수 있고 아무것도 실행하지 않습니다. `notify`·훅은 **현재 폴더의 config.json을 읽지 않습니다** (훅은 남의 저장소 안에서 돌기 때문에, 그 저장소가 심어 둔 설정이 위험 패턴이나 `fail_open`을 바꾸지 못하게).
 - 바깥으로 나가는 요청은 직접 켠 것뿐: `vision`/`llm`, `open_meteo`(기본 꺼짐), `forward_events`(기본 비어 있음).
 - `config.json`에는 토큰과 비상 코드가 있으니 커밋하지 마세요 (`.gitignore`에 포함).
@@ -250,7 +301,7 @@ Claude Code `settings.json` (사용자 `~/.claude/settings.json` 또는 프로�
 python3 -m unittest discover -s tests -v
 ```
 
-외부 네트워크 없이 돌아갑니다 (날씨는 가짜 fetch, nvidia-smi는 가짜 runner, 서버는 포트 0). Node + Playwright(Chromium)가 있으면 `test_page_smoke`가 실제 브라우저로 폰 페이지를 띄워 JS 오류 없이 디버거·알람(가짜 카메라)·집사·출발·관중석 흐름이 도는지 보고, 마지막에 **진짜 훅**으로 `rm -rf ./build` 결재를 올려 폰 화면에서 승인 버튼을 눌러 훅이 `allow` JSON을 내는지까지 확인합니다. 없으면 건너뜁니다.
+외부 네트워크 없이 돌아갑니다 (날씨는 가짜 fetch, nvidia-smi는 가짜 runner, 서버는 포트 0). Node + Playwright(Chromium)가 있으면 `test_page_smoke`가 실제 브라우저로 폰 페이지를 띄워 JS 오류 없이 디버거·알람(가짜 카메라)·집사·출발·관중석·매크로 패드(탭 버튼, 확인 창, NFC 해시 진입 — 가짜 launcher) 흐름이 도는지 보고, 마지막에 **진짜 훅**으로 `rm -rf ./build` 결재를 올려 폰 화면에서 승인 버튼을 눌러 훅이 `allow` JSON을 내는지까지 확인합니다. 없으면 건너뜁니다.
 
 ## 7. 로드맵 (다음 모듈 후보)
 

@@ -143,5 +143,124 @@
     "device": "cuda",
     "compute_type": "float16",
     "language": "ko"
+  },
+  "macro": {
+    "enabled": true,
+    "max_per_minute": 20,
+    "min_interval_seconds": 0.5,
+    "max_chain": 8,
+    "audit_keep": 200,
+    "audit_file": "",
+    "items": [
+      {
+        "id": "vscode",
+        "label": "VS Code",
+        "emoji": "💻",
+        "color": "#5aa9ff",
+        "type": "launch",
+        "program": "C:/Users/me/AppData/Local/Programs/Microsoft VS Code/Code.exe",
+        "args": [
+          "C:/dev/myapp"
+        ]
+      },
+      {
+        "id": "steam",
+        "label": "Steam",
+        "emoji": "🎮",
+        "color": "#9aa7b8",
+        "type": "launch",
+        "program": "C:/Program Files (x86)/Steam/steam.exe",
+        "args": []
+      },
+      {
+        "id": "docs",
+        "label": "문서",
+        "emoji": "📄",
+        "type": "url",
+        "url": "https://docs.python.org/3/"
+      },
+      {
+        "id": "playpause",
+        "label": "재생/정지",
+        "emoji": "⏯️",
+        "color": "#4cd17b",
+        "type": "keys",
+        "keys": "play/pause"
+      },
+      {
+        "id": "volup",
+        "label": "볼륨+",
+        "emoji": "🔊",
+        "type": "keys",
+        "keys": "volumeup"
+      },
+      {
+        "id": "voldown",
+        "label": "볼륨-",
+        "emoji": "🔉",
+        "type": "keys",
+        "keys": "volumedown"
+      },
+      {
+        "id": "desktop",
+        "label": "바탕화면",
+        "emoji": "🖥️",
+        "type": "keys",
+        "keys": "win+d"
+      },
+      {
+        "id": "sign",
+        "label": "서명 입력",
+        "emoji": "✍️",
+        "type": "text",
+        "text": "감사합니다.\n홍길동 드림"
+      },
+      {
+        "id": "leave",
+        "label": "출발 체크",
+        "emoji": "🚪",
+        "type": "sidekick",
+        "action": "departure"
+      },
+      {
+        "id": "cheer",
+        "label": "박수",
+        "emoji": "👏",
+        "type": "sidekick",
+        "action": "stadium",
+        "event": "ci_ok"
+      },
+      {
+        "id": "workmode",
+        "label": "작업 모드",
+        "emoji": "🚀",
+        "color": "#ffb347",
+        "type": "chain",
+        "steps": [
+          "vscode",
+          {
+            "id": "docs",
+            "delay": 2
+          }
+        ]
+      },
+      {
+        "id": "lock",
+        "label": "화면 잠금",
+        "emoji": "🔒",
+        "color": "#ff5a5a",
+        "type": "keys",
+        "keys": "win+l",
+        "confirm": true
+      },
+      {
+        "id": "nfc_play",
+        "label": "책상 태그: 재생/정지",
+        "emoji": "🏷️",
+        "type": "keys",
+        "keys": "play/pause",
+        "nfc_key": "여기에-macro-key"
+      }
+    ]
   }
 }

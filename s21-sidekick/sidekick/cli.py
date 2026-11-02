@@ -85,10 +85,15 @@ def main(argv=None):
 
     h = sub.add_parser("hook", help="rm -rf 결재 보고: Claude Code PreToolUse 훅 (stdin JSON)")
     h.add_argument("--config", help="기본: $SIDEKICK_CONFIG 또는 저장소 루트의 config.json")
+    sub.add_parser("macro-key", help="매크로 NFC 태그용 무작위 nfc_key 하나 만들기 (config의 해당 매크로에만 넣기)")
     args = ap.parse_args(argv)
 
     if args.cmd == "serve":
         return _serve(args)
+    if args.cmd == "macro-key":
+        import secrets
+        print(secrets.token_urlsafe(24))
+        return 0
     if args.cmd == "notify":
         return notify(args.event, args.detail, args.lines, args.config, args.url, args.token)
     from .hook import main as hook_main

@@ -30,6 +30,11 @@
   body.ring { animation: flash 1s infinite; }
   @keyframes flash { 50% { background:#400; } }
   .say { font-size:1.2rem; margin:.6rem 0; min-height:1.5em; }
+  #macroGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(8.5rem,1fr)); gap:.6rem; }
+  #macroGrid button { min-height:7rem; border:0; border-radius:.8rem; font-size:1rem; font-weight:600; color:#000; background:var(--ac); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.3rem; padding:.5rem; }
+  #macroGrid button .em { font-size:2.2rem; }
+  #macroGrid button:disabled { opacity:.5; }
+  #macroResult { margin-top:.8rem; font-size:1.05rem; min-height:1.4em; }
   button.okb { background:var(--ok); color:#000; }
   #checklist { font-size:1.15rem; line-height:1.6; padding-left:1.2rem; }
   /* 결재 보고 */
@@ -63,6 +68,7 @@
   <button data-tab="butler">집사</button>
   <button data-tab="depart">출발</button>
   <button data-tab="stadium">관중석</button>
+  <button data-tab="macro">매크로</button>
 </nav>
 <div class="say" id="lastSay" style="padding:0 1rem"></div>
 
@@ -119,6 +125,13 @@
   <div class="row"><button class="alt big" data-ev="push_ok">푸시 성공</button><button class="alt big" data-ev="ci_fail">CI 실패</button></div>
   <div class="row"><button class="alt big" data-ev="pr_merged">PR 머지</button><button class="alt big" data-ev="push_fail">푸시 실패</button></div>
   <div class="muted" id="stadiumInfo"></div>
+</section>
+
+<section id="macro">
+  <p class="muted">누르면 PC가 config에 미리 적어 둔 동작만 실행해요. (NFC 태그: README 참고)</p>
+  <div id="macroGrid"></div>
+  <div id="macroResult" role="status"></div>
+  <details><summary class="muted">최근 실행 기록</summary><div id="macroAudit" class="muted"></div></details>
 </section>
 
 <div id="approval" role="dialog" aria-modal="true">
@@ -573,6 +586,59 @@ function approvalListen(id) {
     rec.start();
   } catch (e) { log("결재 음성 인식 실패: " + e.message); }
 }
+
+// ---------- 7) 매크로 패드: 폰은 id만 보낸다. 동작 내용은 PC의 config에만 있다 ----------
+function showMacroResult(j, label) {
+  const msg = j.ok ? "✅ " + (j.emoji || "") + " " + (j.label || label) + " — " + (j.message || "완료") : "⚠️ " + (j.error || "실패");
+  $("macroResult").textContent = msg; log("매크로: " + msg);
+}
+async function runMacro(id, label, needConfirm, key) {
+  const call = (confirmed) => api("/api/macro", { id, confirmed }, key ? { headers: { "X-Sidekick-Token": key } } : undefined);
+  try {
+    const ask = (l) => window.confirm("정말 실행할까요?\n" + l);
+    let j;
+    if (needConfirm) { if (!ask(label)) { $("macroResult").textContent = "취소했어요"; return; } j = await call(true); }
+    else {
+      j = await call(false);
+      if (j.needs_confirm) {  // 서버가 확인을 요구하면(예: NFC) 여기서 묻고 다시 보낸다
+        if (!ask((j.emoji || "") + " " + (j.label || label))) { $("macroResult").textContent = "취소했어요"; return; }
+        j = await call(true);
+      }
+    }
+    showMacroResult(j, label);
+  } catch (e) { $("macroResult").textContent = "⚠️ " + e.message; log("매크로 실패: " + e.message); }
+}
+async function loadMacros() {
+  if (!state.token) return;
+  try {
+    const j = await api("/api/config"); const grid = $("macroGrid"); grid.textContent = "";
+    for (const m of j.macros || []) {
+      const b = document.createElement("button"); b.dataset.macro = m.id;
+      if (m.color) b.style.background = m.color;
+      const em = document.createElement("span"); em.className = "em"; em.textContent = m.emoji || "▶";
+      const lb = document.createElement("span"); lb.textContent = m.label;
+      b.append(em, lb);
+      b.onclick = async () => { b.disabled = true; try { await runMacro(m.id, m.label, m.confirm); } finally { b.disabled = false; } };
+      grid.appendChild(b);
+    }
+    if (!(j.macros || []).length) grid.textContent = "설정된 매크로가 없어요 (config의 macro.items)";
+  } catch (e) { log(e.message); }
+}
+async function loadMacroAudit() {
+  try {
+    const j = await api("/api/macro/audit?n=20"); const box = $("macroAudit"); box.textContent = "";
+    for (const a of j.audit) { const d = document.createElement("div"); d.textContent = a.time.slice(11) + " " + a.id + " [" + a.source + "] " + a.outcome; box.appendChild(d); }
+  } catch (e) { /* 토큰 없음 등 */ }
+}
+document.querySelector('nav button[data-tab="macro"]').addEventListener("click", () => { loadMacros(); loadMacroAudit(); });
+(function nfcEntry() {  // 태그 주소: https://<host>/#macro=<id>&nfc=<nfc_key>  (메인 토큰이 아니다)
+  const h = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const id = h.get("macro"), key = h.get("nfc");
+  if (!id || !key) return;
+  history.replaceState(null, "", location.pathname);  // 주소창·기록에서 키 제거 (저장하지 않음)
+  document.querySelector('nav button[data-tab="macro"]').click();
+  runMacro(id, id, false, key);
+})();
 </script>
 </body>
 </html>

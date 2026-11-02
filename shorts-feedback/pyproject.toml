@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shorts-feedback"
+version = "0.1.0"
+description = "쇼츠 피드백 도구: 썸네일 투표, 댓글 군집, 스튜디오 CSV 요약, 실패 편 부검, 제작 피로 규칙"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+shorts-feedback = "shortsfb.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["shortsfb", "shortsfb.*"]

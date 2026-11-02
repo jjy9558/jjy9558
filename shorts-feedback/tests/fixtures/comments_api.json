@@ -1,0 +1,11 @@
+{
+  "kind": "youtube#commentThreadListResponse",
+  "items": [
+    {"snippet": {"videoId": "vid0001", "topLevelComment": {"snippet": {
+        "authorDisplayName": "김철수실명", "authorChannelId": {"value": "UCfakechannelid0001"},
+        "textDisplay": "윗집 층간소음 얘기 <br>다음 편도 올려 주세요", "textOriginal": "윗집 층간소음 얘기 다음 편도 올려 주세요", "likeCount": 3}},
+        "totalReplyCount": 1},
+     "replies": {"comments": [{"snippet": {"authorDisplayName": "이영희실명", "textOriginal": "저도 궁금해요 어떻게 됐나요?"}}]}},
+    {"snippet": {"topLevelComment": {"snippet": {"authorDisplayName": "박스팸실명", "textOriginal": "맞구독 해요 https://spam.example/x"}}}}
+  ]
+}

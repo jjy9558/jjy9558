@@ -1,0 +1,15 @@
+{
+  "title": "kakao-wrapped: 단톡방 연말 결산",
+  "project": "../../kakao-wrapped",
+  "cwd": "{{work}}",
+  "width": 84,
+  "height": 20,
+  "env": {"PYTHONPATH": "{{project}}"},
+  "steps": [
+    {"type": "comment", "text": "# 가짜 단톡방 대화(전부 지어낸 내용)를 만들고"},
+    {"type": "cmd", "run": "python {{project}}/examples/make_sample_chat.py chat.txt", "show": "python examples/make_sample_chat.py chat.txt"},
+    {"type": "comment", "text": "# 이름을 가린 채로 결산 HTML 생성"},
+    {"type": "cmd", "run": "python -m kakao_wrapped chat.txt --anonymize --top 3", "show": "python -m kakao_wrapped chat.txt --anonymize --top 3"},
+    {"type": "pause", "seconds": 1.5}
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "title": "steam-buddy: 환불 기한 · 구매 돌아보기",
+  "project": "../../steam-buddy",
+  "width": 84,
+  "height": 24,
+  "env": {"STEAM_BUDDY_HOME": "{{home}}/.steam-buddy"},
+  "steps": [
+    {"type": "setup", "files": {
+      "home/.steam-buddy/data.json": {
+        "config": {},
+        "games": {
+          "1091500": {"appid": 1091500, "name": "사이버펑크 2077", "purchased_at": "{{days_ago:1}}", "price_paid": 39600, "minutes": 50, "source": "수동"},
+          "367520": {"appid": 367520, "name": "할로우 나이트", "purchased_at": "{{days_ago:9}}", "price_paid": 18000, "minutes": 95, "source": "수동"},
+          "413150": {"appid": 413150, "name": "스타듀 밸리", "purchased_at": "{{days_ago:12}}", "price_paid": 18500, "minutes": 1260, "source": "수동"},
+          "1245620": {"appid": 1245620, "name": "엘든 링", "purchased_at": "{{days_ago:40}}", "price_paid": 64800, "minutes": 0, "source": "수동"}
+        }
+      }
+    }},
+    {"type": "comment", "text": "# 환불 기한 확인: 14일 이내 + 플레이 2시간 미만"},
+    {"type": "cmd", "run": "python -m steam_buddy status", "show": "steam-buddy status"},
+    {"type": "pause", "seconds": 1.2},
+    {"type": "comment", "text": "# 구매 후 돌아보기: 만족도를 남기고"},
+    {"type": "cmd", "run": "python -m steam_buddy rate 스타듀 5 --note \"힐링 최고\"", "show": "steam-buddy rate 스타듀 5 --note \"힐링 최고\""},
+    {"type": "cmd", "run": "python -m steam_buddy rate 엘든 2 --note \"아직 한 번도 안 켬\"", "show": "steam-buddy rate 엘든 2 --note \"아직 한 번도 안 켬\""},
+    {"type": "pause", "seconds": 0.6},
+    {"type": "cmd", "run": "python -m steam_buddy report", "show": "steam-buddy report"},
+    {"type": "pause", "seconds": 1.5}
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "_comment": "예시 형식입니다. 숫자는 가짜 자리표시자이므로 실제 단가(백만 토큰당)로 바꿔 쓰세요.",
+  "models": {
+    "small": {"in_per_mtok": 1.0, "out_per_mtok": 5.0},
+    "mid": {"in_per_mtok": 3.0, "out_per_mtok": 15.0},
+    "large": {"in_per_mtok": 15.0, "out_per_mtok": 75.0}
+  }
+}

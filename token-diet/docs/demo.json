@@ -1,0 +1,21 @@
+{
+  "title": "token-diet",
+  "project": "..",
+  "width": 84,
+  "height": 20,
+  "steps": [
+    {
+      "type": "comment",
+      "text": "# 동작 확인"
+    },
+    {
+      "type": "cmd",
+      "run": "python -m tokendiet hello",
+      "show": "token-diet hello"
+    },
+    {
+      "type": "pause",
+      "seconds": 1.0
+    }
+  ]
+}

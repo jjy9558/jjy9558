@@ -11,7 +11,7 @@
 ```
 
 핵심은 **사람의 검수**입니다. 이 도구는 검수를 생략하는 용도가 아니라, 검수가 빨라지도록
-문제 줄에 플래그를 달아주는 용도입니다. Python 3.9+, 핵심 코드는 표준 라이브러리만 사용합니다
+문제 줄에 플래그를 달아주는 용도입니다. Python 3.12+, 핵심 코드는 표준 라이브러리만 사용합니다
 (faster-whisper는 `transcribe` 단계에서만 import).
 
 ## 설치
@@ -103,6 +103,57 @@ python3 -m subpipe price x --minutes 12.5 --tiers basic=4500,entertainment=7000,
 ```
 기본 단가: AI번역+감수 5,000원/분, 예능·드라마 7,000원/분, 의학·IT 10,000원/분. 과금 단위는 기본 올림(분), `--round half|none`.
 SRT를 넣으면 마지막 자막 종료 시각을 길이로 봅니다(영상 전체 길이보다 짧을 수 있음).
+
+### 5-1) QA 마크다운 리포트
+```bash
+python3 -m subpipe qa talk.ko.srt --md talk.qa.md
+```
+기본 출력과 종료 코드는 그대로이고, `--md`를 주면 항목별(번호 연속성, 겹침, 빈 큐, CPS, 줄 길이 등) 건수 요약과 상세 표를 파일로도 저장합니다.
+
+### 7) 견적서 (`quote`)
+```bash
+python3 -m subpipe quote talk.srt --rate 5000 --review-multiplier 1.5 --unit 100 --md quote.md
+```
+금액 = 과금 분량(`--round ceil|half|none`) x 분당 단가 x 검수 배수. 최종 금액은 `--unit`원 단위로 **사사오입(half-up)** 반올림합니다
+(`--amount-round up|down`으로 올림/내림). 예: 601초, 5,000원/분, 배수 1.25, 단위 100 -> 11분 x 6,250 = 68,750 -> 68,800원.
+(`price`는 요금제 표 비교용으로 그대로 유지됩니다.)
+
+### 8) 작업 장부 (`ledger`)
+```bash
+python3 -m subpipe ledger start "고객A_영상1" --minutes 10 --quote 50000 --est-hours 2
+python3 -m subpipe ledger stop                 # 소요 시간, 실질 시급 표시
+python3 -m subpipe ledger report --target-hourly 20000
+```
+`ledger.json`(기본, `--ledger`로 변경)에 기록합니다. 실질 시급 = 견적 금액 / 소요 시간, 그 외 영상 1분당 작업 분,
+예상 시간 대비 %. 한 번에 한 작업만 진행할 수 있으며 `--at 2025-01-01T10:00:00`으로 시각을 직접 지정할 수 있습니다.
+
+### 9) 납품 (`deliver`)
+```bash
+python3 -m subpipe deliver talk.ko.srt -o 납품/고객A [--config subpipe.json]
+```
+납품 폴더에 `이름.srt`(복사본), `이름.qa.md`, `이름.notice.txt`(고지 한 줄)를 만듭니다. 원본은 절대 덮어쓰지 않으며
+(폴더가 원본과 같으면 거부), 납품 폴더에 같은 파일이 있으면 `--force` 없이는 거부합니다. QA 오류가 있으면 `--allow-errors` 없이는 납품하지 않습니다.
+
+고지문은 설정 파일(JSON)의 `disclosure`로 바꿉니다 (기본: "본 자막은 AI 초안 작성 후 사람이 검수했습니다."):
+```json
+{"disclosure": "AI 초안 후 사람이 검수한 자막입니다."}
+```
+
+### 10) 전기료 (`power`)
+```bash
+nvidia-smi --query-gpu=timestamp,power.draw --format=csv -l 5 > gpu.csv    # 작업 중 기록
+python3 -m subpipe power gpu.csv --tiers 200=100,400=200,inf=300 --base-kwh 150
+```
+로그를 사다리꼴 적분해 kWh를 구하고, 월 누진 구간을 반영해 **이번 작업이 늘린 전기료**(기존 사용량 `--base-kwh` 위에 더한 몫)를 계산합니다.
+`[N/A]`/깨진 행은 건너뛰고, `--max-gap`(기본 60초)보다 벌어진 샘플 사이는 집계에서 제외하며, 헤더가 없으면 `timestamp,power` 순서로 가정합니다.
+샘플이 2개 미만이면 오류(종료 코드 1)입니다.
+
+**누진 구간은 직접 입력해야 합니다.** 구간을 주지 않으면 코드의 `예시용 임의 값`(200kWh까지 100원, 400kWh까지 200원, 이후 300원)을 쓰며
+출력에 경고를 표시합니다. 이 값은 실제 한전 요금이 아닙니다. 설정 파일로 지정하려면:
+```json
+{"power": {"tiers": [{"upto_kwh": 200, "rate": 100}, {"upto_kwh": 400, "rate": 200}, {"upto_kwh": null, "rate": 300}]}}
+```
+기본 요금, 부가세, 기금, 전력 외 부하(CPU, 모니터 등)는 포함하지 않습니다.
 
 ## 검수 팁
 1. 먼저 `플래그 있는 줄만` 으로 위험한 줄부터 처리하고, 그 다음 전체를 한 번 읽으며 어색한 번역을 고칩니다.

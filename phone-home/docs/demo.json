@@ -1,0 +1,26 @@
+{
+  "title": "phone-home",
+  "project": "..",
+  "width": 84,
+  "height": 20,
+  "steps": [
+    {
+      "type": "comment",
+      "text": "# 설정 만들기와 서비스 상태 확인"
+    },
+    {
+      "type": "cmd",
+      "run": "python -m phonehome --config /tmp/ph-demo.json init --force",
+      "show": "phone-home init"
+    },
+    {
+      "type": "cmd",
+      "run": "python -m phonehome --config /tmp/ph-demo.json check",
+      "show": "phone-home check"
+    },
+    {
+      "type": "pause",
+      "seconds": 1.5
+    }
+  ]
+}

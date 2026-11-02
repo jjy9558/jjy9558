@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "phone-home"
+version = "0.1.0"
+description = "S21 폰 홈: 서비스 타일 런처 + 토큰 하나 리버스 프록시 + 사장님 책상"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+phone-home = "phonehome.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["phonehome", "phonehome.*"]

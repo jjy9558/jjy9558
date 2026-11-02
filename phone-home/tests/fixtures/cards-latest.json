@@ -1,0 +1,10 @@
+[
+  {"kind": "bill", "title": "가스비 납부", "detail": "38,200원 · 자동이체 아님", "due": "2026-11-04",
+   "actions": [{"id": "open-paper", "label": "영수증 보기", "url": "/s/sidekick/"}, "mark-paid"]},
+  {"kind": "game", "title": "로스트아크 점검", "detail": "10:00~14:00", "due": "2026-11-03T10:00"},
+  {"kind": "sub", "title": "넷플릭스 갱신", "detail": "13,500원", "due": "2026-11-05",
+   "actions": [{"id": "cool-report", "label": "구독 리포트"}]},
+  {"kind": "note", "title": "마감 없는 메모", "detail": "", "due": ""},
+  {"kind": "bad"},
+  "문자열 카드는 무시"
+]

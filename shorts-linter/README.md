@@ -7,7 +7,7 @@
 ![데모](docs/demo.svg)
 <!-- demo:end -->
 
-- Python 3.9+ 표준 라이브러리만 사용 (설치 불필요)
+- Python 3.9+ (새 명령 포함, 3.12+에서 테스트) 표준 라이브러리만 사용 (설치 불필요)
 - `ffmpeg`/`ffprobe`가 있으면 영상 분석, 없으면 해당 검사만 `⏭️ 건너뜀`으로 표시 (자막/메타/약속 검사는 계속 동작)
 - 모든 외부 호출은 인자 리스트(`shell=False`), 네트워크는 기본적으로 사용하지 않음 (LLM 판정은 옵션, 로컬 서버)
 
@@ -40,11 +40,37 @@ python -m shortslint check-dir ./out --md report.md --json report.json
   "thumbnail_text": "결말 반전",
   "claims": ["실화", "충격"],
   "ai_disclosure": true,
+  "ai_used": {"voice": true, "image": true, "script": false},
+  "title_candidates": ["시어머니가 숨긴 3가지 비밀", "..."],
   "transcript": "clip.txt"
 }
 ```
 
 `thumbnail_text`는 썸네일에 넣은 문구입니다 (OCR은 하지 않으므로 직접 적어 주세요).
+
+## 추가 명령 (업로드 전 보조 도구)
+
+기존 `check`/`check-dir` 출력은 그대로입니다. 아래는 별도 명령이며 모두 결정적(같은 입력이면 같은 출력)이고 LLM/네트워크를 쓰지 않습니다.
+
+```bash
+python -m shortslint similar ./scripts [--history ./old] [--threshold 0.5] [--words] [--strict]
+python -m shortslint disclose clip.meta.json
+python -m shortslint sources add --name bgm1 --license CC0 --url https://... --ai no [--file sources.csv]
+python -m shortslint sources list|check [--file sources.csv] [--strict]
+python -m shortslint titles clip.meta.json [--transcript clip.txt]
+```
+
+- **similar**: 폴더의 `*.txt`/`*.srt`/`*.ass` 대본(같은 이름이면 `.txt` 우선)끼리, `--history` 폴더의 과거 대본과도 비교합니다.
+  글자 3-gram 자카드 유사도(띄어쓰기 변형에 강함)이며 `--words`로 어절 2-gram을 평균에 더합니다.
+  대본마다 가장 닮은 상위 3편과 점수를 보여 주고, 임계(기본 50%, 설정 `similar.threshold`) 이상이면 "재활용 콘텐츠 위험" 경고를 냅니다.
+  경고는 종료 코드 0이며 `--strict`일 때만 1입니다. 비슷한 대본을 반복 업로드하면 재활용/반복 콘텐츠로 분류될 위험이 있어 쓰는 점검입니다.
+- **disclose**: meta의 `"ai_used": {"voice": true, "image": true, "script": false}`로 어떤 요소가 합성인지 한국어 공개 문구 초안을 만들고,
+  업로드 화면의 "변경되거나 합성된 콘텐츠" 확인 안내를 함께 출력합니다. 정책은 바뀔 수 있으므로 문구는 초안일 뿐이며 **공식 문서 확인**이 필요합니다.
+- **sources**: BGM/이미지 출처 장부(csv: `name,license,source_url,ai_generated`). 같은 이름으로 `add`하면 갱신됩니다.
+  `check`는 라이선스·출처 URL·AI 생성 여부가 비어 있는 항목마다 경고합니다 (URL은 문자열만 기록, 접속하지 않음).
+- **titles**: `title_candidates`(없으면 `title`)를 100점 만점으로 정렬합니다: 길이 40(12~40자 만점, 40자 초과/8자 미만 감점) +
+  대본 약속 일치 40(기존 B9 `promise` 로직 재사용: 키워드 일치율, 숫자·이름·결말/반전 불일치 감점) + 과장 금칙어 20
+  (`clickbait_words`, `titles.exaggeration_words`, `banned_words`). 대본은 `--transcript`, meta의 `transcript`, 옆의 `<이름>.txt|srt|ass` 순으로 찾으며 없으면 약속 항목은 중립(20점) 처리합니다.
 
 ## 검사 항목과 이유
 

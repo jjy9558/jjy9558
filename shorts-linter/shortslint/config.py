@@ -75,6 +75,18 @@ DEFAULTS = {
             "반전": ["반전", "알고 보니", "알고보니", "사실은", "뜻밖", "그런데"],
         },
     },
+    "similar": {
+        "char_n": 3,                    # 글자 n-gram (한국어는 띄어쓰기 변형에 강함)
+        "word_n": 2,                    # --words 사용 시 어절 n-gram
+        "threshold": 0.5,               # 자카드 유사도가 이 이상이면 재활용 콘텐츠 위험 경고
+        "top": 3,
+    },
+    "titles": {
+        "ideal_min_chars": 12,
+        "hard_min_chars": 8,
+        "exaggeration_words": ["세상에", "믿을 수 없", "난리났", "대박", "미쳤다", "역대급",
+                               "전설", "ㅋㅋㅋ", "!!", "???", "속보", "긴급", "필독", "꼭 보세요"],
+    },
     "llm": {
         "enabled": False,
         "base_url": "http://localhost:11434/v1",   # OpenAI 호환 (Ollama, llama.cpp 등)

@@ -2,7 +2,7 @@ import argparse
 import os
 import sys
 
-from . import report, runner
+from . import disclose, metadata, report, runner, similar, sources, titles
 from .config import load_config
 
 
@@ -21,7 +21,88 @@ def build_parser():
         s.add_argument("--strict", action="store_true", help="⚠️도 실패로 취급")
         s.add_argument("--llm", action="store_true", help="로컬 LLM 판정 사용 (설정의 llm 섹션)")
         s.add_argument("--quiet", action="store_true", help="콘솔 출력 생략")
+    s = sub.add_parser("similar", help="과거 대본과 유사도 비교 (재활용 콘텐츠 위험)")
+    s.add_argument("target", help="clip.txt/.srt/.ass가 있는 폴더")
+    s.add_argument("--history", help="과거 대본 폴더 (추가 비교 대상)")
+    s.add_argument("--threshold", type=float, help="경고 임계 (0~1, 기본 0.5)")
+    s.add_argument("--words", action="store_true", help="어절 n-gram도 함께 사용")
+    s.add_argument("--config")
+    s.add_argument("--strict", action="store_true")
+    s = sub.add_parser("disclose", help="meta.json의 ai_used로 AI 공개 문구 초안 생성")
+    s.add_argument("meta")
+    s = sub.add_parser("sources", help="BGM/이미지 출처 장부")
+    s.add_argument("action", choices=["add", "list", "check"])
+    s.add_argument("--file", default="sources.csv", help="장부 csv (기본 sources.csv)")
+    s.add_argument("--name")
+    s.add_argument("--license", dest="license_")
+    s.add_argument("--url")
+    s.add_argument("--ai", help="AI 생성 여부 yes/no")
+    s.add_argument("--strict", action="store_true")
+    s = sub.add_parser("titles", help="제목 후보 규칙 점수")
+    s.add_argument("meta")
+    s.add_argument("--transcript", help="대본 파일 (생략 시 meta/옆 파일 자동 탐색)")
+    s.add_argument("--config")
     return p
+
+
+def _extra(args):
+    """check/check-dir 외 신규 명령. 종료 코드 반환."""
+    if args.cmd == "disclose":
+        try:
+            print(disclose.format_draft(disclose.draft(metadata.load_meta(args.meta))))
+        except (OSError, ValueError) as e:
+            print("오류: %s" % e, file=sys.stderr)
+            return 2
+        return 0
+    if args.cmd == "sources":
+        if args.action == "add":
+            try:
+                r = sources.add(args.file, args.name, args.license_, args.url, args.ai)
+            except (OSError, ValueError) as e:
+                print("오류: %s" % e, file=sys.stderr)
+                return 2
+            print("%s: %s -> %s" % (r, args.name, args.file))
+            return 0
+        if not os.path.isfile(args.file):
+            print("장부 없음: %s" % args.file, file=sys.stderr)
+            return 2
+        rows = sources.load(args.file)
+        if args.action == "list":
+            print(sources.format_list(rows))
+            return 0
+        issues = sources.check(rows)
+        for _, msg in issues:
+            print("⚠️ " + msg)
+        if not issues:
+            print("✅ 장부 %d건 모두 기재됨" % len(rows))
+        return 1 if issues and args.strict else 0
+    try:
+        cfg = load_config(getattr(args, "config", None))
+    except (OSError, ValueError) as e:
+        print("설정 오류: %s" % e, file=sys.stderr)
+        return 2
+    if args.cmd == "similar":
+        if not os.path.isdir(args.target):
+            print("폴더 없음: %s" % args.target, file=sys.stderr)
+            return 2
+        if args.history and not os.path.isdir(args.history):
+            print("폴더 없음: %s" % args.history, file=sys.stderr)
+            return 2
+        rows, th = similar.analyze(args.target, cfg, args.history, args.words, args.threshold)
+        if not rows:
+            print("대본(.txt/.srt/.ass)이 없습니다: %s" % args.target, file=sys.stderr)
+            return 2
+        print(similar.format_rows(rows, th))
+        return 1 if args.strict and any(r["risk"] for r in rows) else 0
+    # titles
+    try:
+        meta = metadata.load_meta(args.meta)
+    except (OSError, ValueError) as e:
+        print("오류: %s" % e, file=sys.stderr)
+        return 2
+    tr = titles.load_transcript(meta, args.meta, args.transcript)
+    print(titles.format_rank(titles.rank(meta, tr, cfg)))
+    return 0
 
 
 def main(argv=None):
@@ -30,6 +111,8 @@ def main(argv=None):
     except Exception:  # noqa: BLE001
         pass
     args = build_parser().parse_args(argv)
+    if args.cmd in ("similar", "disclose", "sources", "titles"):
+        return _extra(args)
     try:
         cfg = load_config(args.config, args.profile)
     except (OSError, ValueError) as e:

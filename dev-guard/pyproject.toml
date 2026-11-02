@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dev-guard"
+version = "0.1.0"
+description = "개발자 안전장치 팩: 비밀 커밋 경보, 금요일 배포 차단기, 에이전트 파업, 지갑 고발장"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+devguard = "devguard.cli:main"
+
+[tool.setuptools]
+packages = ["devguard"]

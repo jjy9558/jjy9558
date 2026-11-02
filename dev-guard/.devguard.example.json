@@ -1,0 +1,35 @@
+{
+  "friday": {
+    "days": ["fri"],
+    "after": "15:00",
+    "before": "24:00",
+    "all_day_days": [],
+    "branches": ["main", "master", "release/*"],
+    "tags": []
+  },
+  "secrets": {
+    "disable_rules": [],
+    "min_entropy": 3.5
+  },
+  "strike": {
+    "enabled": true,
+    "threshold": 3,
+    "edit_flips": 3,
+    "max_denies": 3,
+    "ttl_seconds": 1800,
+    "action": "deny",
+    "output": "json",
+    "ignore_regex": []
+  },
+  "wallet": {
+    "daily_limit_usd": 20,
+    "warn_ratio": 0.8,
+    "ntfy_url": "",
+    "prices_confirmed": false,
+    "prices": {
+      "opus":   {"input": 15.0, "output": 75.0, "cache_read": 1.5, "cache_write": 18.75, "cache_write_1h": 30.0},
+      "sonnet": {"input": 3.0,  "output": 15.0, "cache_read": 0.3, "cache_write": 3.75,  "cache_write_1h": 6.0},
+      "haiku":  {"input": 1.0,  "output": 5.0,  "cache_read": 0.1, "cache_write": 1.25,  "cache_write_1h": 2.0}
+    }
+  }
+}

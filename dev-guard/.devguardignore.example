@@ -1,0 +1,7 @@
+# 저장소 루트에 .devguardignore 로 저장하세요. 한 줄에 하나, # 은 주석.
+tests/fixtures/        # 디렉터리 통째로 검사 제외
+*.sample.json          # 슬래시 없는 글롭은 파일명에 적용
+docs/api-keys-demo.md  # 경로 글롭
+.env.test              # .env 계열이지만 비밀이 없는 파일
+rule:openai-key        # 특정 규칙 끄기 (규칙 이름은 README 표 참고)
+line:EXAMPLE_ONLY      # 이 문자열이 들어간 줄은 무시

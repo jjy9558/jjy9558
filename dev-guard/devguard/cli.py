@@ -27,6 +27,9 @@ HELP_EPILOG = """\
   wallet report|alert|stop-hook|init
   scan <파일...>             파일에서 비밀 후보 찾기 (시험용)
   settings-snippet           .claude/settings.json hooks 블록 출력
+                             (--with-sidekick PATH / --with-nagger / --merge FILE [--dry-run])
+  permissions-report         권한 소음 측정: 자주 쓴 도구/명령 -> allow 후보 제안 (수정 안 함)
+  wallet payslip --month M   야근 수당 명세서 (HTML)
 """
 
 
@@ -69,6 +72,10 @@ def _build_parser() -> argparse.ArgumentParser:
     a.add_argument("--projects-dir", default=None)
     sh = ws.add_parser("stop-hook", help="(Stop 훅) 오늘 지출 한 줄")
     sh.add_argument("--projects-dir", default=None)
+    p2 = ws.add_parser("payslip", help="야근 수당 명세서 HTML")
+    p2.add_argument("--month", default=None, help="YYYY-MM (기본: 이번 달)")
+    p2.add_argument("--out", default=None, help="저장 경로 (기본 devguard-payslip-YYYY-MM.html, '-' 는 stdout)")
+    p2.add_argument("--projects-dir", default=None)
     ws.add_parser("init", help="~/.devguard/config.json 템플릿 생성 (없을 때만)")
 
     s = sub.add_parser("scan", help="파일 비밀 검사 (시험용)")
@@ -78,6 +85,20 @@ def _build_parser() -> argparse.ArgumentParser:
     s.add_argument("--only", default="strike,wallet", help="strike,wallet 중 선택")
     s.add_argument("--python", default=None)
     s.add_argument("--no-stop", action="store_true", help="Stop 훅(지갑) 제외")
+    s.add_argument("--with-sidekick", default=None, metavar="PATH",
+                   help="s21-sidekick/hooks/claude_pretooluse.py 경로 (위험 명령 결재 훅, 가장 앞에 배치)")
+    s.add_argument("--with-nagger", nargs="?", const="", default=None, metavar="PATH",
+                   help="life-nagger 훅 스크립트 경로 (생략하면 형제 폴더에서 찾음, 없으면 건너뜀)")
+    s.add_argument("--merge", default=None, metavar="SETTINGS_JSON",
+                   help="출력 대신 이 파일에 중복 없이 병합 (.bak 백업 먼저)")
+    s.add_argument("--dry-run", action="store_true", help="--merge 와 함께: diff 만 보여 주고 쓰지 않음")
+
+    s = sub.add_parser("permissions-report", help="권한 소음 측정기 (allow 후보 제안만)")
+    s.add_argument("--projects-dir", default=None)
+    s.add_argument("--days", type=int, default=0, help="최근 N일 파일만 (기본 0 = 전체)")
+    s.add_argument("--min-count", type=int, default=3)
+    s.add_argument("--top", type=int, default=20)
+    s.add_argument("--json", action="store_true")
     return p
 
 
@@ -156,6 +177,8 @@ def _cmd_wallet(args) -> int:
         print("만들었습니다: %s\n단가(prices)를 공식 가격 페이지 기준으로 고친 뒤 prices_confirmed 를 true 로 바꾸세요." % path)
         return 0
     root = getattr(args, "projects_dir", None) or wallet.projects_dir()
+    if sub == "payslip":
+        return _cmd_payslip(args, cfg, root)
     if sub == "report":
         now = _dt.datetime.now().astimezone()
         since = wallet.start_of_day(now) - _dt.timedelta(days=max(args.days, 1) - 1)
@@ -174,10 +197,90 @@ def _cmd_wallet(args) -> int:
     return 2
 
 
+def _cmd_payslip(args, cfg, root) -> int:
+    from devguard import payslip
+    month = args.month or _dt.datetime.now().strftime("%Y-%m")
+    tz = _dt.datetime.now().astimezone().tzinfo
+    try:
+        start, _end = payslip.month_bounds(month, tz)
+    except ValueError as exc:
+        eprint("[devguard] %s" % exc)
+        return 2
+    usages = wallet_load(root, start)
+    rows = payslip.compute(usages, month, wallet_prices(cfg), tz)
+    text = payslip.render_html(rows, month, bool(cfg["wallet"].get("prices_confirmed")))
+    if args.out == "-":
+        sys.stdout.write(text)
+        return 0
+    out = args.out or "devguard-payslip-%s.html" % month
+    with open(out, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+    print("명세서를 만들었습니다: %s" % out)
+    return 0
+
+
+def wallet_load(root, start):
+    from devguard import wallet
+    return wallet.load_usage(root, start)
+
+
+def wallet_prices(cfg):
+    from devguard import wallet
+    return wallet.merged_prices(cfg["wallet"])
+
+
+def _cmd_permissions(args) -> int:
+    import time
+    from devguard import permissions, wallet
+    root = args.projects_dir or wallet.projects_dir()
+    min_mtime = time.time() - args.days * 86400 if args.days > 0 else None
+    tools, bash, total = permissions.count_tool_calls(root, min_mtime)
+    sug = permissions.suggest(tools, bash, max(args.min_count, 1), max(args.top, 1))
+    if args.json:
+        print(permissions.report_json(tools, bash, total, sug))
+    else:
+        print(permissions.format_report(tools, bash, total, sug))
+    return 0
+
+
 def _cmd_snippet(args) -> int:
     from devguard import snippet
     only = split_csv(args.only)
-    print(snippet.render(args.python, None, only, stop=not args.no_stop))
+    sidekick = args.with_sidekick
+    nagger = args.with_nagger
+    if sidekick and not os.path.isfile(sidekick):
+        eprint("[devguard] 경고: sidekick 훅 파일이 없습니다 (경로만 그대로 사용): %s" % sidekick)
+    if nagger is not None:
+        if nagger == "":
+            nagger = snippet.find_nagger_hook()
+            if nagger is None:
+                eprint("[devguard] life-nagger 에 Claude Code 훅이 없어 건너뜁니다 (경로를 직접 주려면 --with-nagger PATH).")
+        elif not os.path.isfile(nagger):
+            eprint("[devguard] 경고: nagger 훅 파일이 없습니다 (경로만 그대로 사용): %s" % nagger)
+    data = snippet.build(args.python, None, only, stop=not args.no_stop,
+                         sidekick=sidekick, nagger=nagger or None)
+    if args.dry_run and not args.merge:
+        eprint("[devguard] --dry-run 은 --merge 와 함께 쓰세요.")
+        return 2
+    if args.merge:
+        try:
+            info = snippet.merge_file(args.merge, data, dry_run=args.dry_run)
+        except snippet.SettingsError as exc:
+            eprint("[devguard] 병합 실패 (%s): %s" % (args.merge, exc))
+            return 1
+        except OSError as exc:
+            eprint("[devguard] 병합 실패 (%s): %s" % (args.merge, exc))
+            return 1
+        if not info["changed"]:
+            print("변경 없음: 이미 모두 들어 있습니다 (%s)" % args.merge)
+            return 0
+        sys.stdout.write(info["diff"])
+        if args.dry_run:
+            print("\n(dry-run: 파일을 수정하지 않았습니다)")
+        else:
+            print("\n병합 완료: %s%s" % (args.merge, ("  (백업: %s)" % info["backup"]) if info["backup"] else ""))
+        return 0
+    print(json.dumps(data, ensure_ascii=False, indent=2))
     eprint(snippet.NOTES)
     return 0
 
@@ -235,6 +338,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return _cmd_wallet(args)
     if cmd == "scan":
         return _cmd_scan(args)
+    if cmd == "permissions-report":
+        return _cmd_permissions(args)
     if cmd == "settings-snippet":
         return _cmd_snippet(args)
     parser.print_help()

@@ -14,7 +14,7 @@ Python 3.9+, **표준 라이브러리만** 사용, 네트워크 불필요(ntfy �
 | 2 | 금요일 배포 차단기 | 금요일 15시 이후 main/master/release/* 푸시 차단 | git `pre-push` |
 | 3 | 에이전트 파업 | 같은 명령 3연속 실패 / 같은 파일 되돌림 반복 시 다음 시도 거부 | Claude Code hooks |
 | 4 | 지갑 고발장 | 로컬 트랜스크립트로 일별/세션별 토큰·비용 집계, 한도 알림 | CLI + Claude Code `Stop` 훅 |
-| 5 | settings-snippet | `.claude/settings.json` 에 붙일 hooks 블록 출력 | CLI |
+| 5 | settings-snippet (+ --merge) | `.claude/settings.json` 에 붙일 hooks 블록 출력 | CLI |
 
 ## 빠른 시작
 
@@ -164,6 +164,14 @@ python -m devguard wallet init                # ~/.devguard/config.json 템플�
 - **Stop 훅**: `python devguard_run.py wallet stop-hook` -> `{"systemMessage": "[devguard 지갑] 오늘 $12.34 / 한도 $20.00 (62%) | 이 세션 $3.21"}` 한 줄을 출력(Claude 를 막지 않음, `decision` 안 냄). 예외가 나면 아무 것도 출력하지 않고 종료코드 0.
 - 한계: 이 값은 **로컬 로그 기반 추정치**입니다. 구독제(정액) 사용자라면 실제 청구액이 아니라 "API 였다면" 환산액이며, 로그 형식이 바뀌면 파서를 고쳐야 합니다.
 
+### 야근 수당 명세서 (`wallet payslip`)
+
+```bash
+python -m devguard wallet payslip --month 2026-05              # devguard-payslip-2026-05.html 생성
+python -m devguard wallet payslip --month 2026-05 --out -      # stdout 으로
+```
+Claude 가 혼자 일한 시간을 월급 명세서 모양의 자체 완결 HTML(외부 리소스 없음) 한 장으로 만듭니다. 세션별로 응답 타임스탬프 사이 15분 이내의 간격만 이어 붙여 시간을 재고, 평일 09~18시는 정규, 그 외 야근, 22~06시 심야, 주말 특근으로 나눕니다. 토큰과 환산 청구액은 위 지갑 고발장과 같은 파서·단가표를 쓰며, **단가가 예시값이면 명세서에도 경고가 붙습니다.** 시간·금액 모두 추정치이고 농담용입니다.
+
 ## 5) settings-snippet
 
 ```bash
@@ -171,17 +179,42 @@ python -m devguard settings-snippet                 # strike + wallet
 python -m devguard settings-snippet --only strike   # 파업만
 python -m devguard settings-snippet --no-stop       # Stop 훅 제외
 python -m devguard settings-snippet --python "C:/Python312/python.exe"
+python -m devguard settings-snippet --with-sidekick C:/dev/s21-sidekick/hooks/claude_pretooluse.py
+python -m devguard settings-snippet --with-nagger [PATH]
 ```
-stdout 에는 JSON 만, 안내는 stderr 로 나가므로 `> snippet.json` 이 안전합니다. **settings 파일을 자동으로 수정하지 않습니다.** `~/.claude/settings.json`(전체) 또는 `<프로젝트>/.claude/settings.json` 의 `hooks` 에 직접 병합하세요. `PostToolUseFailure` 이벤트를 모르는 버전이면 그 항목만 지우세요.
+기본은 출력만 합니다. stdout 에는 JSON 만, 안내는 stderr 로 나가므로 `> snippet.json` 이 안전합니다. `PostToolUseFailure` 이벤트를 모르는 버전이면 그 항목만 지우세요.
+
+- `--with-sidekick PATH`: s21-sidekick 의 위험 명령 결재 훅(`Bash|PowerShell`, timeout 60)을 같은 hooks 블록에 넣습니다. **PreToolUse 순서는 위험 명령 결재 -> strike -> 나머지** 입니다.
+- `--with-nagger [PATH]`: life-nagger 의 Claude Code 훅을 Stop 이벤트(지갑 한 줄 뒤)에 넣습니다. 현재 life-nagger 에는 이런 훅이 없어서, PATH 없이 쓰면 형제 폴더 `life-nagger/hooks/` 를 찾아보고 없으면 안내만 하고 건너뜁니다.
+
+### 기존 settings.json 에 병합 (`--merge`)
+
+```bash
+python -m devguard settings-snippet --with-sidekick PATH --merge ~/.claude/settings.json --dry-run   # diff 만
+python -m devguard settings-snippet --with-sidekick PATH --merge ~/.claude/settings.json             # 실제 병합
+```
+- **지정한 파일 하나만** 읽고 씁니다 (다른 settings 는 건드리지 않음). 파일이 없으면 새로 만듭니다.
+- 변경이 있을 때만 쓰며, 쓰기 전에 `settings.json.bak` 을 만듭니다 (이미 있으면 `.bak.1`, `.bak.2` ... 로 덮어쓰지 않음). 임시 파일에 쓴 뒤 교체합니다.
+- 알 수 없는 키와 기존 훅은 그대로 두고, 같은 이벤트에 같은 `command` 가 이미 있으면 추가하지 않으므로 **몇 번 실행해도 결과가 같습니다**(두 번째는 "변경 없음", 백업도 안 만듦). 새 PreToolUse 항목은 기존 항목 앞에 들어갑니다.
+- JSON 이 깨졌거나 `hooks` 모양이 이상하면 파일을 그대로 두고 종료코드 1.
+- `--dry-run`(`--merge` 와 함께만 허용)은 unified diff 만 보여 주고 아무 것도 쓰지 않습니다.
+
+## 6) 권한 소음 측정기 (`permissions-report`)
+
+```bash
+python -m devguard permissions-report                    # ~/.claude/projects/**/*.jsonl 전체
+python -m devguard permissions-report --days 30 --min-count 5 --top 15 --json
+```
+tool_use 를 도구별 / Bash 명령 접두어별(`git status`, `npm run` 처럼 하위 명령 포함, `&&` `|` `;` 로 이은 명령은 나눠서)로 세어 `permissions.allow` 후보(`Bash(git status:*)`, `Read` ...)를 **제안만** 출력합니다. `rm`, `sudo`, `curl`, `git push` 같은 위험해 보이는 것은 "검토 필요" 로 따로 빼며, **settings 는 절대 수정하지 않습니다.** 적용은 직접 하세요.
 
 ---
 
 ## 파일 구성
 
 ```
-devguard/            scanner.py precommit.py friday.py strike.py wallet.py snippet.py githooks.py config.py cli.py common.py
+devguard/            scanner.py precommit.py friday.py strike.py wallet.py snippet.py permissions.py payslip.py githooks.py config.py cli.py common.py
 devguard_run.py      설치 없이 절대경로로 호출하는 런처 (훅이 사용)
-tests/               unittest (159개)
+tests/               unittest (178개)
 .devguard.example.json  .devguardignore.example
 ```
 

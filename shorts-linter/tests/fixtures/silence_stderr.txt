@@ -1,0 +1,5 @@
+[silencedetect @ 0x1] silence_start: -0.0021
+[silencedetect @ 0x1] silence_end: 1.8 | silence_duration: 1.8021
+[silencedetect @ 0x1] silence_start: 20.0
+[silencedetect @ 0x1] silence_end: 24.5 | silence_duration: 4.5
+[silencedetect @ 0x1] silence_start: 40.0

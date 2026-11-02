@@ -1,0 +1,10 @@
+{
+  "streams": [
+    {"index": 0, "codec_name": "h264", "codec_type": "video", "width": 1080, "height": 1920,
+     "pix_fmt": "yuv420p", "r_frame_rate": "30/1", "avg_frame_rate": "30000/1001",
+     "duration": "45.200000", "disposition": {"attached_pic": 0}},
+    {"index": 1, "codec_name": "aac", "codec_type": "audio", "sample_rate": "48000", "channels": 2}
+  ],
+  "format": {"format_name": "mov,mp4,m4a,3gp,3g2,mj2", "duration": "45.230000",
+             "size": "18874368", "bit_rate": "3338000"}
+}

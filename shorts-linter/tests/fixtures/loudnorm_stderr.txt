@@ -1,0 +1,16 @@
+[Parsed_silencedetect_0 @ 0x55d0] silence_start: 12.5
+[Parsed_silencedetect_0 @ 0x55d0] silence_end: 15.25 | silence_duration: 2.75
+[Parsed_loudnorm_1 @ 0x55d1]
+{
+	"input_i" : "-19.42",
+	"input_tp" : "-0.35",
+	"input_lra" : "6.10",
+	"input_thresh" : "-29.80",
+	"output_i" : "-14.60",
+	"output_tp" : "-1.50",
+	"output_lra" : "5.20",
+	"output_thresh" : "-24.90",
+	"normalization_type" : "dynamic",
+	"target_offset" : "0.60"
+}
+size=N/A time=00:00:45.20 bitrate=N/A speed= 120x

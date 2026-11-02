@@ -1,0 +1,8 @@
+{
+  "streams": [
+    {"index": 0, "codec_name": "hevc", "codec_type": "video", "width": 1920, "height": 1080,
+     "pix_fmt": "yuv420p", "r_frame_rate": "24/1", "avg_frame_rate": "24/1",
+     "side_data_list": [{"side_data_type": "Display Matrix", "rotation": -90}]}
+  ],
+  "format": {"format_name": "mov,mp4,m4a,3gp,3g2,mj2", "duration": "200.0", "size": "1000", "bit_rate": "100"}
+}

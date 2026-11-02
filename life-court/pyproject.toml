@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "life-court"
+version = "0.1.0"
+description = "야식·지각·내기를 판결문으로 만드는 웃긴 재판소"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+life-court = "lifecourt.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["lifecourt", "lifecourt.*"]

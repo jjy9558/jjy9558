@@ -1,0 +1,21 @@
+{
+  "title": "life-court",
+  "project": "..",
+  "width": 84,
+  "height": 36,
+  "steps": [
+    {
+      "type": "comment",
+      "text": "# 야식 재판소"
+    },
+    {
+      "type": "cmd",
+      "run": "python -m lifecourt night-snack --food 치킨 --time 23:40 --kcal 1200 --no-save --date 2026-11-02",
+      "show": "life-court night-snack --food 치킨 --time 23:40 --kcal 1200"
+    },
+    {
+      "type": "pause",
+      "seconds": 2.0
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{"date": "2026-11-02", "generated_at": "2026-11-02 06:10", "count": 5, "source_errors": [],
+ "overview": ["llama.cpp에 새 양자화 방식이 들어와 로컬 LLM 속도가 크게 빨라졌다는 소식",
+              "RTX 50 시리즈 재고가 풀리며 그래픽카드 가격이 내려가는 중",
+              "파이썬 3.14 정식 릴리스 이후 주요 라이브러리 호환 현황 정리",
+              "네 번째 줄은 top=3 이라서 빠져야 함"],
+ "clusters": [{"topic": "로컬 LLM", "items": [{"title": "양자화 소식", "url": "https://example.com/a", "summary": "요약"}]}]}

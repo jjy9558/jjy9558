@@ -1,0 +1,21 @@
+{
+  "title": "morning-brief",
+  "project": "..",
+  "width": 84,
+  "height": 20,
+  "steps": [
+    {
+      "type": "comment",
+      "text": "# 어댑터 상태표 (연결 안 된 것은 '연결 안 됨')"
+    },
+    {
+      "type": "cmd",
+      "run": "python -m mbrief sources --config mbrief.example.json",
+      "show": "morning-brief sources"
+    },
+    {
+      "type": "pause",
+      "seconds": 1.5
+    }
+  ]
+}

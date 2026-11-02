@@ -1,0 +1,3 @@
+{"type":"user","timestamp":"2026-11-01T16:00:00Z","cwd":"/work/api-server","sessionId":"s2","uuid":"u2","message":{"role":"user","content":"API 서버 마이그레이션 진행해줘"}}
+{"type":"assistant","timestamp":"2026-11-01T16:30:00Z","cwd":"/work/api-server","sessionId":"s2","uuid":"a3","message":{"role":"assistant","content":[{"type":"text","text":"마이그레이션을 시작했습니다. 하지만 DB 쓰기 권한 승인이 필요합니다. 계속 진행할까요?"}]}}
+{"type":"user","timestamp":"2026-10-30T16:00:00Z","cwd":"/work/old","sessionId":"s3","uuid":"u3","message":{"role":"user","content":"밤 창 밖의 오래된 메시지"}}

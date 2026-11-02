@@ -1,0 +1,23 @@
+{
+  "seen": {},
+  "alerts_sent": {},
+  "entries": {
+    "g1": {"gid": "g1", "appid": 1, "game": "로스트아크", "title": "정기 점검 안내", "url": "https://example.com/n/g1",
+           "category": "점검", "post_ts": 1793000000, "start": "2026-11-02T01:00:00Z", "end": "2026-11-02T03:00:00Z",
+           "all_day": false, "summary": [], "summary_mode": "extract", "is_notice": false},
+    "g2": {"gid": "g2", "appid": 2, "game": "게임비", "title": "서비스 종료 안내", "url": "https://example.com/n/g2",
+           "category": "서비스 종료", "post_ts": 1793000000, "start": "2026-11-05", "end": null,
+           "all_day": true, "summary": [], "summary_mode": "extract", "is_notice": false},
+    "g3": {"gid": "g3", "appid": 3, "game": "일정없음", "title": "점검 이야기", "url": "",
+           "category": "점검", "post_ts": 1793000000, "start": "2026-11-02", "end": null,
+           "all_day": true, "summary": [], "summary_mode": "", "is_notice": true},
+    "g4": {"gid": "g4", "appid": 4, "game": "이벤트게임", "title": "가을 이벤트", "url": "",
+           "category": "이벤트", "post_ts": 1793000000, "start": "2026-10-25", "end": "2026-11-03",
+           "all_day": true, "summary": [], "summary_mode": "extract", "is_notice": false},
+    "g5": {"gid": "g5", "appid": 5, "game": "옛날게임", "title": "지난 점검", "url": "",
+           "category": "점검", "post_ts": 1790000000, "start": "2026-10-20T01:00:00Z", "end": "2026-10-20T03:00:00Z",
+           "all_day": false, "summary": [], "summary_mode": "extract", "is_notice": false},
+    "g6": {"gid": "g6", "appid": 6, "game": "깨진항목", "title": "형식 오류", "url": "",
+           "category": "점검", "post_ts": 1, "start": "내일쯤", "end": null, "all_day": true, "is_notice": false}
+  }
+}

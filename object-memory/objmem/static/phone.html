@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>내 물건 기억 - 카메라</title>
+<style>
+  :root { --bg:#fafafa; --fg:#1b1b1f; --card:#fff; --mut:#666; --ac:#2563eb; --bd:#d9d9e0; --ok:#15803d; --er:#b91c1c; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14151a; --fg:#ececf1; --card:#1e2028; --mut:#9a9aa8; --ac:#6ea0ff; --bd:#33353f; --ok:#4ade80; --er:#f87171; } }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui,sans-serif; max-width:560px; margin-inline:auto; }
+  h1 { font-size:1.2rem; margin:0 0 12px; }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius:12px; padding:12px; margin-bottom:12px; }
+  label { display:block; font-size:.85rem; color:var(--mut); margin-top:8px; }
+  input, select, button { font:inherit; padding:8px 10px; border-radius:8px; border:1px solid var(--bd); background:var(--bg); color:var(--fg); width:100%; box-sizing:border-box; }
+  button { background:var(--ac); color:#fff; border:0; margin-top:10px; font-weight:600; }
+  button.sec { background:transparent; color:var(--fg); border:1px solid var(--bd); }
+  video { width:100%; border-radius:8px; background:#000; max-height:30vh; object-fit:cover; }
+  #last { font-size:1.1rem; font-weight:600; }
+  .ok { color:var(--ok); } .er { color:var(--er); } .mut { color:var(--mut); font-size:.85rem; }
+  #log { white-space:pre-wrap; font:12px/1.4 ui-monospace,monospace; max-height:140px; overflow:auto; }
+</style>
+</head>
+<body>
+<h1>내 물건 기억 - 카메라</h1>
+<div class="card">
+  <video id="v" playsinline muted></video>
+  <label>카메라 이름 (예: 거실, 책상)</label><input id="cam" value="거실" maxlength="40">
+  <label>촬영 간격 (분)</label><input id="iv" type="number" min="0.05" step="any" value="5">
+  <label>토큰 (이 폰에만 저장됨)</label><input id="tok" type="password" autocomplete="off">
+  <button id="go">시작</button>
+  <button id="pause" class="sec" disabled>일시정지</button>
+</div>
+<div class="card">
+  <div class="mut">마지막 업로드</div>
+  <div id="last">없음</div>
+  <div id="state" class="mut">대기 중</div>
+  <div class="mut">화면 켜짐 유지: <span id="wl">꺼짐</span></div>
+</div>
+<div class="card"><div id="log" class="mut"></div></div>
+<p class="mut">내 공간만 비추세요. 함께 사는 사람에게 알리고, 욕실·침실 등 사생활 공간은 향하지 마세요. 사진은 이 PC 서버로만 보냅니다.</p>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var stream = null, timer = null, running = false, wake = null, busy = false;
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; }
+  function log(m) { var l = $("log"); l.textContent = new Date().toLocaleTimeString() + " " + m + "\n" + l.textContent.slice(0, 2000); }
+  function state(m, cls) { var s = $("state"); s.textContent = m; s.className = cls || "mut"; }
+
+  // #token=...&interval=...&camera=... 로 열면 값을 채우고 주소창에서 지움
+  var hp = new URLSearchParams(location.hash.replace(/^#/, ""));
+  if (hp.get("token")) store("objmem.token", hp.get("token"));
+  if (hp.get("interval")) store("objmem.iv", hp.get("interval"));
+  if (hp.get("camera")) store("objmem.cam", hp.get("camera"));
+  if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+  $("tok").value = store("objmem.token") || "";
+  if (store("objmem.iv")) $("iv").value = store("objmem.iv");
+  if (store("objmem.cam")) $("cam").value = store("objmem.cam");
+
+  // 8x8 평균 해시: 8x8 그레이스케일 축소 → 평균 이상이면 1 → 16자리 hex (서버가 해밍 거리로 중복 판정)
+  function avgHash(video) {
+    var c = document.createElement("canvas"); c.width = 8; c.height = 8;
+    var x = c.getContext("2d", { willReadFrequently: true });
+    x.drawImage(video, 0, 0, 8, 8);
+    var d = x.getImageData(0, 0, 8, 8).data, g = [], sum = 0, i;
+    for (i = 0; i < 64; i++) { var v = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]; g.push(v); sum += v; }
+    var mean = sum / 64, hex = "";
+    for (i = 0; i < 64; i += 4) {
+      var n = 0;
+      for (var j = 0; j < 4; j++) n = n * 2 + (g[i + j] >= mean ? 1 : 0);
+      hex += n.toString(16);
+    }
+    return hex;
+  }
+
+  async function capture() {
+    if (busy || !stream) return;
+    busy = true;
+    try {
+      var v = $("v");
+      var w = v.videoWidth, h = v.videoHeight;
+      if (!w) { state("카메라 준비 중...", "mut"); return; }
+      var s = Math.min(1, 1280 / Math.max(w, h));
+      var c = document.createElement("canvas"); c.width = Math.round(w * s); c.height = Math.round(h * s);
+      c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+      var hash = avgHash(v);
+      var blob = await new Promise(function (res) { c.toBlob(res, "image/jpeg", 0.85); });
+      if (!blob) throw new Error("JPEG 인코딩 실패");
+      var url = "/api/frame?camera=" + encodeURIComponent($("cam").value.trim()) + "&hash=" + hash;
+      var r = await fetch(url, { method: "POST", headers: { "X-ObjMem-Token": $("tok").value.trim(), "Content-Type": "image/jpeg" }, body: blob });
+      var j = {}; try { j = await r.json(); } catch (e) {}
+      if (!r.ok) throw new Error("서버 " + r.status + " " + (j.error || ""));
+      var names = { stored: "저장됨", similar: "이전과 거의 같아 건너뜀", duplicate: "같은 사진이라 건너뜀", privacy: "개인정보 시간대라 저장 안 함" };
+      $("last").textContent = new Date().toLocaleString();
+      state((names[j.status] || j.status) + (j.described === false && j.status === "stored" ? " (설명은 나중에)" : ""), "ok");
+      log("업로드 " + j.status + " hash=" + hash);
+      window.__lastUpload = { status: j.status, at: Date.now() };
+    } catch (e) {
+      state("업로드 실패: " + e.message, "er"); log("오류 " + e.message);
+    } finally { busy = false; }
+  }
+
+  function schedule(first) {
+    clearTimeout(timer);
+    if (!running) return;
+    var ms = first ? 1500 : Math.max(3000, parseFloat($("iv").value || "5") * 60000);
+    timer = setTimeout(async function () { await capture(); schedule(false); }, ms);
+  }
+
+  async function lock() {
+    try { if ("wakeLock" in navigator) { wake = await navigator.wakeLock.request("screen"); $("wl").textContent = "켜짐"; wake.addEventListener("release", function () { $("wl").textContent = "꺼짐"; }); } }
+    catch (e) { $("wl").textContent = "사용 불가"; }
+  }
+  document.addEventListener("visibilitychange", function () { if (running && document.visibilityState === "visible") lock(); });
+
+  $("go").onclick = async function () {
+    store("objmem.token", $("tok").value.trim()); store("objmem.iv", $("iv").value); store("objmem.cam", $("cam").value);
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 } }, audio: false });
+    } catch (e) { state("카메라를 열 수 없음: " + e.message + " (HTTPS 또는 localhost 필요)", "er"); return; }
+    $("v").srcObject = stream; await $("v").play().catch(function () {});
+    running = true; $("go").disabled = true; $("pause").disabled = false; $("pause").textContent = "일시정지";
+    state("촬영 중", "ok"); lock(); schedule(true);
+  };
+  $("pause").onclick = function () {
+    if (running) {
+      running = false; clearTimeout(timer);
+      if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); stream = null;
+      if (wake) wake.release().catch(function () {});
+      $("pause").textContent = "재개"; state("일시정지됨 (카메라 꺼짐)", "mut");
+    } else { $("go").disabled = false; $("go").click(); $("pause").textContent = "일시정지"; }
+  };
+})();
+</script>
+</body>
+</html>

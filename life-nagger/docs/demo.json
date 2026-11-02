@@ -1,0 +1,49 @@
+{
+ "title": "life-nagger: 지각 변명 · 카운터",
+ "project": "..",
+ "cwd": "{{work}}",
+ "width": 84,
+ "height": 24,
+ "env": {
+  "PYTHONPATH": "{{project}}"
+ },
+ "steps": [
+  {
+   "type": "setup",
+   "files": {
+    "home/.life-nagger/counters.jsonl": "{\"t\": \"{{hours_ago:2}}\", \"k\": \"sigh\", \"n\": 1}\n{\"t\": \"{{hours_ago:3}}\", \"k\": \"sigh\", \"n\": 1}\n{\"t\": \"{{hours_ago:4}}\", \"k\": \"sigh\", \"n\": 1}\n{\"t\": \"{{hours_ago:5}}\", \"k\": \"sigh\", \"n\": 1}\n{\"t\": \"{{hours_ago:6}}\", \"k\": \"sigh\", \"n\": 1}\n{\"t\": \"{{hours_ago:7}}\", \"k\": \"sigh\", \"n\": 1}\n{\"t\": \"{{hours_ago:26}}\", \"k\": \"sigh\", \"n\": 1}\n{\"t\": \"{{hours_ago:27}}\", \"k\": \"sigh\", \"n\": 1}\n{\"t\": \"{{hours_ago:28}}\", \"k\": \"sigh\", \"n\": 1}\n{\"t\": \"{{hours_ago:30}}\", \"k\": \"sigh\", \"n\": 1}\n{\"t\": \"{{hours_ago:2}}\", \"k\": \"pushup\", \"n\": 20}\n{\"t\": \"{{hours_ago:26}}\", \"k\": \"pushup\", \"n\": 30}\n{\"t\": \"{{hours_ago:50}}\", \"k\": \"dishes\", \"n\": 1}\n{\"t\": \"{{hours_ago:5}}\", \"k\": \"pushup\", \"n\": 15}\n"
+   }
+  },
+  {
+   "type": "comment",
+   "text": "# 지각 변명 생성기 (정직 옵션은 항상 포함)"
+  },
+  {
+   "type": "cmd",
+   "run": "python -m nagger excuse --late 20 --to 팀장 --seed 1",
+   "show": "nagger excuse --late 20 --to 팀장"
+  },
+  {
+   "type": "pause",
+   "seconds": 1.2
+  },
+  {
+   "type": "comment",
+   "text": "# 한숨 +1, 이번 주 잔소리 리포트"
+  },
+  {
+   "type": "cmd",
+   "run": "python -m nagger count sigh",
+   "show": "nagger count sigh"
+  },
+  {
+   "type": "cmd",
+   "run": "python -m nagger report --week",
+   "show": "nagger report --week"
+  },
+  {
+   "type": "pause",
+   "seconds": 1.5
+  }
+ ]
+}

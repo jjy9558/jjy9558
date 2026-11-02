@@ -1,0 +1,38 @@
+{
+ "title": "dev-guard: 비밀 커밋 도둑 경보",
+ "project": "..",
+ "cwd": "{{work}}",
+ "width": 84,
+ "height": 24,
+ "env": {
+  "PYTHONPATH": "{{project}}",
+  "DEVGUARD_HOME": "{{home}}/.devguard"
+ },
+ "steps": [
+  {
+   "type": "setup",
+   "files": {
+    "work/mkfake.py": "import string\na = string.ascii_letters + string.digits\ntok = \"\".join(a[(i * 17 + 5) % len(a)] for i in range(40))\nfake_ant = \"sk-\" + \"ant-\" + \"api03-\" + tok\nfake_gh = \"gh\" + \"p_\" + tok[:36]\nsrc = 'import os\\n\\nDEBUG = True\\nANTHROPIC_API_KEY = \"%s\"\\nDB_PASSWORD = os.environ[\"DB_PASSWORD\"]\\nGITHUB_TOKEN = \"%s\"\\n'\nopen(\"config.py\", \"w\").write(src % (fake_ant, fake_gh))\n"
+   }
+  },
+  {
+   "type": "cmd",
+   "hidden": true,
+   "run": "python mkfake.py"
+  },
+  {
+   "type": "comment",
+   "text": "# 실수로 API 키(여기선 실행 중 만든 가짜 값)가 든 파일을 커밋하려 하면"
+  },
+  {
+   "type": "cmd",
+   "run": "python -m devguard scan config.py",
+   "show": "devguard scan config.py",
+   "allow_fail": true
+  },
+  {
+   "type": "pause",
+   "seconds": 2.5
+  }
+ ]
+}

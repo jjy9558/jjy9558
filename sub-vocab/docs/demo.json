@@ -1,0 +1,16 @@
+{
+  "title": "sub-vocab: 자막에서 단어장 만들기",
+  "project": "..",
+  "cwd": "{{work}}",
+  "width": 84,
+  "height": 24,
+  "env": {"PYTHONPATH": "{{project}}"},
+  "steps": [
+    {"type": "comment", "text": "# 자막(.srt)에서 모르는 단어만 골라 단어장으로 (LLM 없이)"},
+    {"type": "cmd", "run": "python -m subvocab {{project}}/tests/fixtures/sample.srt --no-llm --top 10 --out out", "show": "python -m subvocab sample.srt --no-llm --top 10 --out out"},
+    {"type": "pause", "seconds": 0.8},
+    {"type": "comment", "text": "# 만들어진 단어장 확인"},
+    {"type": "cmd", "run": "python -c \"print(open('out/vocab.md', encoding='utf-8').read())\"", "show": "cat out/vocab.md"},
+    {"type": "pause", "seconds": 1.5}
+  ]
+}

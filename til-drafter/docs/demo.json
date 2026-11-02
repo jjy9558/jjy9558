@@ -1,0 +1,41 @@
+{
+ "title": "til-drafter: 하루치 TIL 초안",
+ "project": "..",
+ "cwd": "{{work}}",
+ "width": 84,
+ "height": 28,
+ "env": {
+  "PYTHONPATH": "{{project}}"
+ },
+ "steps": [
+  {
+   "type": "setup",
+   "files": {
+    "home/.claude/projects/blog-engine/s1.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-11-02T01:10:00Z\", \"cwd\": \"/home/dev/blog-engine\", \"sessionId\": \"s1\", \"message\": {\"role\": \"user\", \"content\": \"마크다운 렌더링에서 한글 제목 앵커가 깨지는 이유를 찾아서 고쳐줘. 담당자 메일은 dev.kim@example.com 이야.\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-11-02T01:12:00Z\", \"cwd\": \"/home/dev/blog-engine\", \"sessionId\": \"s1\", \"message\": {\"role\": \"assistant\", \"content\": [{\"type\": \"text\", \"text\": \"확인해 볼게요.\"}, {\"type\": \"tool_use\", \"id\": \"t\", \"name\": \"Read\", \"input\": {\"file_path\": \"/home/dev/blog-engine/src/anchor.py\"}}, {\"type\": \"tool_use\", \"id\": \"t\", \"name\": \"Edit\", \"input\": {\"file_path\": \"/home/dev/blog-engine/src/anchor.py\"}}, {\"type\": \"tool_use\", \"id\": \"t\", \"name\": \"Bash\", \"input\": {\"command\": \"pytest -q\"}}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-11-02T01:20:00Z\", \"cwd\": \"/home/dev/blog-engine\", \"sessionId\": \"s1\", \"message\": {\"role\": \"assistant\", \"content\": [{\"type\": \"text\", \"text\": \"원인은 slugify 가 한글을 ASCII 로 변환하면서 빈 문자열이 되어 앵커가 중복된 것이었습니다. 유니코드 문자를 보존하도록 고쳤고 테스트 12개가 모두 통과합니다. 해결: 정규식에서 \\\\w 대신 가-힣 범위를 허용했기 때문에 정상 동작합니다.\"}]}}\n{\"type\": \"user\", \"timestamp\": \"2026-11-02T03:00:00Z\", \"cwd\": \"/home/dev/blog-engine\", \"sessionId\": \"s1\", \"message\": {\"role\": \"user\", \"content\": \"RSS 피드에 포스트 날짜가 UTC 로 나오는데 KST 로 맞춰줘.\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-11-02T03:05:00Z\", \"cwd\": \"/home/dev/blog-engine\", \"sessionId\": \"s1\", \"message\": {\"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"t\", \"name\": \"Edit\", \"input\": {\"file_path\": \"/home/dev/blog-engine/src/feed.py\"}}, {\"type\": \"tool_use\", \"id\": \"t\", \"name\": \"Bash\", \"input\": {\"command\": \"pytest -q\"}}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-11-02T03:08:00Z\", \"cwd\": \"/home/dev/blog-engine\", \"sessionId\": \"s1\", \"message\": {\"role\": \"assistant\", \"content\": [{\"type\": \"text\", \"text\": \"피드 날짜를 KST(+09:00)로 변환하도록 수정했습니다. 이유는 pubDate 를 naive datetime 으로 만들어 UTC 로 해석되고 있었기 때문입니다.\"}]}}\n"
+   }
+  },
+  {
+   "type": "comment",
+   "text": "# Claude Code 세션 로그에서 오늘의 TIL 초안을 뽑고"
+  },
+  {
+   "type": "cmd",
+   "run": "python -m til_drafter --date 2026-11-02 --tz-offset +09:00 --projects-dir {{home}}/.claude/projects --out out",
+   "show": "python -m til_drafter --date 2026-11-02"
+  },
+  {
+   "type": "pause",
+   "seconds": 0.6
+  },
+  {
+   "type": "cmd",
+   "run": "python -c \"print(open('out/2026-11-02.md', encoding='utf-8').read())\"",
+   "show": "cat ~/til-drafts/2026-11-02.md",
+   "max_lines": 24
+  },
+  {
+   "type": "pause",
+   "seconds": 2
+  }
+ ]
+}

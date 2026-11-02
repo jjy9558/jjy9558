@@ -1,0 +1,67 @@
+{
+ "title": "voice-journal: 선언 성적표",
+ "project": "..",
+ "cwd": "{{work}}",
+ "width": 84,
+ "height": 28,
+ "env": {
+  "PYTHONPATH": "{{project}}",
+  "VJOURNAL_DB": "{{home}}/.vjournal/journal.db"
+ },
+ "steps": [
+  {
+   "type": "comment",
+   "text": "# 말한 내용(텍스트)에서 '선언'을 자동으로 목표로 등록"
+  },
+  {
+   "type": "cmd",
+   "hidden": false,
+   "run": "python -m vjournal add \"이번 주에 블로그 2개 쓴다 #글쓰기\" --at \"2026-11-02 09:10\"",
+   "show": "vjournal add \"이번 주에 블로그 2개 쓴다 #글쓰기\""
+  },
+  {
+   "type": "cmd",
+   "hidden": false,
+   "run": "python -m vjournal add \"금요일까지 보고서 끝낸다 #업무\" --at \"2026-11-02 09:12\"",
+   "show": "vjournal add \"금요일까지 보고서 끝낸다 #업무\""
+  },
+  {
+   "type": "cmd",
+   "hidden": true,
+   "run": "python -m vjournal add \"블로그 1개 썼다. 개운하다 #글쓰기\" --at \"2026-11-03 22:00\" --mood 4"
+  },
+  {
+   "type": "cmd",
+   "hidden": true,
+   "run": "python -m vjournal add \"보고서 끝냈다. 제출 완료 #업무\" --at \"2026-11-05 18:00\" --mood 5"
+  },
+  {
+   "type": "cmd",
+   "hidden": true,
+   "run": "python -m vjournal add \"블로그는 너무 바빠서 접기로 했다\" --at \"2026-11-05 22:00\""
+  },
+  {
+   "type": "pause",
+   "seconds": 0.8
+  },
+  {
+   "type": "comment",
+   "text": "# 주말에는 선언 성적표 + '왜 접었지?'"
+  },
+  {
+   "type": "cmd",
+   "run": "python -m vjournal report --week-of 2026-11-02",
+   "show": "vjournal report --week-of 2026-11-02",
+   "max_lines": 14
+  },
+  {
+   "type": "cmd",
+   "run": "python -m vjournal why 블로그",
+   "show": "vjournal why 블로그"
+  },
+  {
+   "type": "pause",
+   "seconds": 1.5
+  }
+ ]
+}

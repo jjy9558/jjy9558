@@ -1,0 +1,62 @@
+{
+ "title": "paper-butler: 고지서·결제문자 정리",
+ "project": "..",
+ "cwd": "{{work}}",
+ "width": 90,
+ "height": 26,
+ "env": {
+  "PYTHONPATH": "{{project}}",
+  "PAPERBUTLER_HOME": "{{home}}/.paperbutler"
+ },
+ "steps": [
+  {
+   "type": "setup",
+   "files": {
+    "work/한전고지서.txt": "[한국전력] 2026년 10월분 전기요금 청구서\n고객번호: 0123-4567-89\n청구금액: 45,230원\n납기내 금액 45,230원  납부기한: 2026.11.25\n납기후 금액 46,590원 (납기후기한 2026.12.10)\n사용량 312kWh\n",
+    "work/건보료.txt": "국민건강보험공단\n2026년 11월분 건강보험료 납부 고지서\n납부자번호 : 1234567890\n납부할 보험료 : 156,780원\n납부기한 : 2026년 11월 10일까지\n",
+    "work/결제문자.txt": "[Web발신]\n[하나카드] 11/01 18:42 승인 스타벅스 강남점 6,300원 일시불\n[Web발신]\n[하나카드] 11/01 12:10 승인 한솥도시락 역삼점 7,200원 일시불\n[Web발신]\n[하나카드] 11/02 09:05 승인 GS25 역삼점 3,400원 일시불\n[Web발신]\n[하나카드] 11/02 14:20 승인 교보문고 광화문점 38,000원 일시불\n"
+   }
+  },
+  {
+   "type": "comment",
+   "text": "# 고지서 사진/문자 텍스트를 던져 넣으면 핵심만 뽑아 줘요 (전부 로컬 처리)"
+  },
+  {
+   "type": "cmd",
+   "run": "python -m paperbutler add 한전고지서.txt --today 2026-11-02 --no-llm",
+   "show": "paperbutler add 한전고지서.txt"
+  },
+  {
+   "type": "cmd",
+   "hidden": true,
+   "run": "python -m paperbutler add 건보료.txt --today 2026-11-02 --no-llm"
+  },
+  {
+   "type": "cmd",
+   "hidden": true,
+   "run": "python -m paperbutler add 결제문자.txt --today 2026-11-02 --no-llm"
+  },
+  {
+   "type": "pause",
+   "seconds": 0.8
+  },
+  {
+   "type": "comment",
+   "text": "# 한 달 안에 낼 것 / 이번 달 가계부"
+  },
+  {
+   "type": "cmd",
+   "run": "python -m paperbutler due --days 30 --today 2026-11-02",
+   "show": "paperbutler due --days 30"
+  },
+  {
+   "type": "cmd",
+   "run": "python -m paperbutler ledger --month 2026-11 --today 2026-11-02",
+   "show": "paperbutler ledger --month 2026-11"
+  },
+  {
+   "type": "pause",
+   "seconds": 1.5
+  }
+ ]
+}

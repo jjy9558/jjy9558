@@ -1,0 +1,73 @@
+{
+ "title": "gamecal: 점검 · 서비스 종료 캘린더",
+ "project": "..",
+ "cwd": "{{work}}",
+ "width": 84,
+ "height": 26,
+ "env": {
+  "PYTHONPATH": "{{project}}"
+ },
+ "steps": [
+  {
+   "type": "setup",
+   "files": {
+    "work/gamecal.json": {
+     "appids": [
+      111
+     ],
+     "names": {
+      "111": "가상 RPG 온라인"
+     },
+     "llm": {
+      "enabled": false
+     },
+     "cache_ttl_hours": 1000000,
+     "default_tz": "Asia/Seoul"
+    },
+    "work/cache/news_111_10.json": {
+     "fetched_at": 0,
+     "items": [
+      {
+       "gid": "1001",
+       "title": "서비스 종료 안내",
+       "url": "https://example.com/notice/1001",
+       "contents": "안녕하세요. 2026년 11월 20일 오후 2시 (KST) 에 서비스를 종료합니다. 그동안 사랑해 주셔서 감사합니다.",
+       "date": 1793500000,
+       "feedlabel": "Community Announcements"
+      },
+      {
+       "gid": "1002",
+       "title": "정기 점검 안내",
+       "url": "https://example.com/notice/1002",
+       "contents": "[h1]정기 점검[/h1] 2026년 11월 5일 오전 4시부터 오전 10시까지 서버 점검이 진행됩니다.",
+       "date": 1793500100,
+       "feedlabel": "Community Announcements"
+      },
+      {
+       "gid": "1003",
+       "title": "Patch 1.4.2 Notes",
+       "url": "https://example.com/notice/1003",
+       "contents": "[list][*] Fixed crash on loading screen [*] Balance changes for the warrior class [*] 한국어 번역 개선[/list]",
+       "date": 1793500200,
+       "feedlabel": "Community Announcements"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "type": "comment",
+   "text": "# 게임 공지(미리 받아 둔 가상 공지)에서 점검·서비스 종료 일정과 D-day 경보를 뽑기"
+  },
+  {
+   "type": "cmd",
+   "run": "python -m gamecal run --dry-run",
+   "show": "gamecal run --dry-run",
+   "max_lines": 24
+  },
+  {
+   "type": "pause",
+   "seconds": 2.5
+  }
+ ]
+}

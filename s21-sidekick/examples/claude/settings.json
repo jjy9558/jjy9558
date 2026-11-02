@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python C:/dev/s21-sidekick/hooks/claude_pretooluse.py",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

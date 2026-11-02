@@ -50,6 +50,48 @@ DEFAULTS = {
         ],
         "motion": {"threshold": 18, "min_changed_ratio": 0.08},
     },
+    # 현관 출발 체크: provider 결과를 이어 붙여 읽는다 (butler provider 재사용).
+    "departure": {
+        "enabled": True,
+        "cooldown_seconds": 300,
+        "intro": "출발 체크할게요.",
+        "outro": "다녀오세요!",
+        "providers": [
+            # 네트워크가 필요하므로 기본 꺼짐. 켜려면 enabled: true + 위도/경도.
+            {"name": "open_meteo", "enabled": False, "latitude": 37.5665, "longitude": 126.9780,
+             "umbrella_threshold": 50, "timeout": 4},
+            {"name": "calendar_next", "path": ""},
+            {"name": "reminders", "items": ["지갑", "열쇠", "휴대폰 충전기"]},
+            # nvidia-smi로 GPU 사용률 확인 (선택, 기본 꺼짐)
+            {"name": "gpu_busy", "enabled": False, "threshold": 30},
+        ],
+    },
+    # 커밋 관중석: python -m sidekick notify <event>
+    "stadium": {
+        "enabled": True,
+        "max_per_minute": 4,
+        "min_interval_seconds": 3,
+        "big_pr_lines": 300,  # pr_merged에 --lines를 주면 이보다 작을 때는 불꽃 대신 박수
+    },
+    # rm -rf 결재 보고: Claude Code PreToolUse 훅 (python -m sidekick hook)
+    "approval": {
+        "enabled": True,
+        "timeout_seconds": 45,  # Claude Code 훅 기본 제한(60초)보다 짧게. 늘리려면 settings.json의 timeout도 늘릴 것
+        "on_timeout": "deny",   # "deny" | "ask"(Claude Code의 원래 확인 창으로 넘김)
+        "fail_open": False,     # 서버에 못 붙으면: False=막음, True="ask"로 넘김
+        "tools": ["Bash", "PowerShell"],
+        "risky_patterns": None,  # None이면 기본 목록(sidekick/hook.py DEFAULT_PATTERNS). 리스트로 주면 교체
+        "extra_patterns": [],    # 기본 목록에 추가: "정규식" 또는 {"pattern": ..., "label": ...}
+        "allow_style": "json",   # "json"(Claude Code 확인 창 생략) | "passthrough"(원래 흐름대로)
+        "deny_style": "exit2",   # "exit2"(stderr + 종료 코드 2, 가장 확실) | "json"
+        "max_pending": 10,
+        "url": "",               # 훅이 붙을 서버 주소. 비우면 http://127.0.0.1:<server.port>
+    },
+    # 외부 프로그램이 폰에 말 시키기: POST /api/say (토큰 필요)
+    "say": {"enabled": True, "max_per_minute": 12, "min_interval_seconds": 1, "max_chars": 300},
+    # 선택(기본 꺼짐): 폰 버튼 이벤트를 다른 로컬 프로그램으로 전달.
+    # 예: [{"url": "http://127.0.0.1:8799/api/event", "token_env": "NAGGER_EVENTS_TOKEN", "types": ["sigh"]}]
+    "forward_events": [],
     "stt": {"model": "small", "device": "auto", "compute_type": "default", "language": "ko"},
 }
 
@@ -85,6 +127,8 @@ def validate(cfg):
         problems.append("alarm.emergency_code(비상 해제 코드)를 설정하세요. 갇히지 않기 위한 안전장치입니다.")
     if cfg["debugger"]["mode"] not in ("log_tail", "command"):
         problems.append("debugger.mode는 'log_tail' 또는 'command'여야 합니다.")
+    if cfg["approval"]["on_timeout"] not in ("deny", "ask"):
+        problems.append("approval.on_timeout은 'deny' 또는 'ask'여야 합니다.")
     if problems:
         raise ConfigError("\n".join(problems))
     return cfg

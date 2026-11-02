@@ -3,14 +3,19 @@ import hmac
 import json
 import os
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from .alarm import Alarm
+from .approval import ApprovalBoard
 from .butler import Butler
 from .debugger import Debugger, default_runner
+from .departure import Departure
 from .events import EventQueue
 from .llm import client_from_config
+from .relay import Forwarder, clean_module, clean_say_text, forward_types, validate_event
+from .stadium import RateLimiter, Stadium
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
@@ -20,15 +25,26 @@ def _spawn_thread(fn, *args):
 
 
 class Sidekick:
-    """모든 모듈을 묶는 앱 객체. 테스트에서는 llm/vision/clock/runner/spawn을 주입한다."""
+    """모든 모듈을 묶는 앱 객체. 테스트에서는 llm/vision/clock/runner/spawn/monotonic/rng를 주입한다."""
 
     def __init__(self, cfg, llm=None, vision=None, clock=None, runner=default_runner,
-                 spawn=_spawn_thread, transcriber=None):
+                 spawn=_spawn_thread, transcriber=None, monotonic=None, rng=None,
+                 departure_registry=None, forward_post=None):
         self.cfg = cfg
         self.events = EventQueue()
         self.debugger = Debugger(cfg["debugger"], llm=llm, runner=runner)
         self.alarm = Alarm(cfg["alarm"], vision=vision, clock=clock)
         self.butler = Butler(cfg["butler"], clock=clock)
+        self.departure = Departure(cfg["departure"], clock=clock, monotonic=monotonic,
+                                   registry=departure_registry, runner=runner)
+        self.stadium = Stadium(cfg["stadium"], monotonic=monotonic, rng=rng)
+        self.approvals = ApprovalBoard(cfg["approval"], self.events, clock=monotonic or time.monotonic)
+        sc = cfg["say"]
+        mono = {"clock": monotonic} if monotonic else {}
+        self.say_limiter = RateLimiter(sc.get("max_per_minute", 12), sc.get("min_interval_seconds", 1), **mono)
+        self.forwarder = Forwarder(cfg.get("forward_events") or [],
+                                   **({"post": forward_post} if forward_post else {}))
+        self.forward_limiter = RateLimiter(30, 0.5, **mono)
         self.spawn = spawn
         self.transcriber = transcriber
 
@@ -143,7 +159,8 @@ class Handler(BaseHTTPRequestHandler):
         return 200, {"alarm": self.app.alarm.status(),
                      "motion": c["butler"]["motion"],
                      "triggers": c["debugger"]["triggers"],
-                     "vision": bool(self.app.alarm.vision)}
+                     "vision": bool(self.app.alarm.vision),
+                     "forward_types": forward_types(c.get("forward_events"))}
 
     def r_events(self, q):
         since = int((q.get("since") or ["0"])[0])
@@ -204,6 +221,89 @@ class Handler(BaseHTTPRequestHandler):
             self.app.events.say(result["say"], module="butler")
         return 200, result
 
+    # ---- 외부 프로그램 -> 폰 말하기 ----
+    def r_say(self, q):
+        sc = self.app.cfg["say"]
+        if not sc.get("enabled", True):
+            return 403, {"error": "say가 꺼져 있습니다 (config say.enabled)"}
+        b = self._json()
+        text = clean_say_text(b.get("text"), int(sc.get("max_chars", 300)))
+        if not text:
+            raise ValueError("text가 비었습니다")
+        ok, wait = self.app.say_limiter.try_acquire()
+        if not ok:
+            return 429, {"error": "너무 자주 보냈어요", "retry_after": int(wait) + 1}
+        ev = self.app.events.say(text, module=clean_module(b.get("module")))
+        return 200, {"ok": True, "id": ev["id"], "text": text}
+
+    # ---- 폰 버튼 이벤트 -> 설정된 로컬 프로그램 (선택) ----
+    def r_phone_event(self, q):
+        b = self._json()
+        kind, n = validate_event(b.get("type"), b.get("n", 1))
+        if not self.app.forwarder.targets_for(kind):
+            return 200, {"ok": False, "forwarded": 0, "reason": "forward_events에 이 type을 받는 곳이 없습니다"}
+        ok, wait = self.app.forward_limiter.try_acquire()
+        if not ok:
+            return 429, {"error": "너무 자주 보냈어요", "retry_after": int(wait) + 1}
+        self.app.spawn(self.app.forwarder.send, kind, n)
+        return 200, {"ok": True, "forwarded": len(self.app.forwarder.targets_for(kind)), "type": kind}
+
+    # ---- 현관 출발 체크 ----
+    def r_departure(self, q):
+        source = str(self._json().get("source") or "button")
+        result = self.app.departure.leave(source=source)
+        if result.get("say"):
+            self.app.events.say(result["say"], module="departure")
+        return 200, result
+
+    # ---- 커밋 관중석 ----
+    def r_notify(self, q):
+        body = self._json()
+        lines = body.get("lines")
+        if lines is not None:
+            try:
+                lines = int(lines)
+            except (TypeError, ValueError):
+                raise ValueError("lines는 정수여야 합니다")
+        r = self.app.stadium.notify(str(body.get("event") or ""), body.get("detail") or "", lines)
+        if r.get("rate_limited"):
+            return 429, dict(r, error="너무 자주 보냈어요. %d초 뒤에 다시." % r["retry_after"])
+        if r.get("ok"):
+            self.app.events.push("stadium", r["say"], sound=r["sound"], emoji=r["emoji"], event=r["event"])
+        return 200, r
+
+    # ---- rm -rf 결재 보고 ----
+    def r_approval_request(self, q):
+        b = self._json()
+        try:
+            return 200, self.app.approvals.create(
+                str(b.get("command") or ""), label=str(b.get("label") or ""),
+                description=str(b.get("description") or ""), tool=str(b.get("tool") or ""),
+                cwd=str(b.get("cwd") or ""), timeout=b.get("timeout_seconds"))
+        except OverflowError as e:
+            return 429, {"error": str(e)}
+
+    def r_approval_wait(self, q):
+        rid = (q.get("id") or [""])[0]
+        wait = min(float((q.get("wait") or ["0"])[0]), 30.0)
+        r = self.app.approvals.wait(rid, wait)
+        return (200, r) if r else (404, {"error": "그런 결재 요청이 없습니다"})
+
+    def r_approval_decide(self, q):
+        b = self._json()
+        try:
+            if b.get("utterance") is not None:
+                r = self.app.approvals.decide(str(b.get("id") or ""), utterance=str(b["utterance"]))
+            else:
+                r = self.app.approvals.decide(str(b.get("id") or ""), decision=str(b.get("decision") or ""),
+                                              via="button")
+        except KeyError:
+            return 404, {"error": "그런 결재 요청이 없습니다"}
+        return 200, r
+
+    def r_approval_pending(self, q):
+        return 200, {"pending": self.app.approvals.pending()}
+
 
 ROUTES = {
     ("GET", "/api/ping"): Handler.r_ping,
@@ -219,6 +319,14 @@ ROUTES = {
     ("POST", "/api/alarm/set"): Handler.r_alarm_set,
     ("POST", "/api/alarm/test"): Handler.r_alarm_test,
     ("POST", "/api/arrival"): Handler.r_arrival,
+    ("POST", "/api/departure"): Handler.r_departure,
+    ("POST", "/api/say"): Handler.r_say,
+    ("POST", "/api/phone_event"): Handler.r_phone_event,
+    ("POST", "/api/notify"): Handler.r_notify,
+    ("POST", "/api/approval/request"): Handler.r_approval_request,
+    ("GET", "/api/approval/wait"): Handler.r_approval_wait,
+    ("POST", "/api/approval/decide"): Handler.r_approval_decide,
+    ("GET", "/api/approval/pending"): Handler.r_approval_pending,
 }
 
 

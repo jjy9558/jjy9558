@@ -7,13 +7,16 @@ S21이 듣고 보면  ──▶  PC가 판단  ──▶  S21이 말하거나 / 
  (마이크·카메라)       (트리거·LLM·VLM)     (TTS)          (미리 정한 명령)
 ```
 
-뼈대는 하나이고, 그 위에 모듈 세 개가 꽂혀 있습니다.
+뼈대는 하나이고, 그 위에 모듈 여섯 개가 꽂혀 있습니다.
 
 | 모듈 | 폰이 하는 일 | PC가 하는 일 |
 |---|---|---|
 | 혼잣말 디버거 | "아 이거 왜 안 돼"를 듣는다 → 요약을 읽어준다 | 최근 에러 로그를 보거나 `claude -p`를 돌린다 |
 | 침대 탈출 알람 | 시끄럽게 울린다 → 칫솔/세면대 사진을 찍는다 | 비전 모델로 판정: "반려. 아직 누워 있음." |
 | 귀가 집사 | 현관 움직임(또는 버튼)을 감지 → 요약을 읽어준다 | 일정·Claude 상태 등 provider 결과를 모은다 |
+| 현관 출발 체크 | "나 간다" 버튼/모션 → 체크리스트를 읽어준다 | 날씨·첫 일정·챙길 것·GPU 상태 provider를 모은다 |
+| 커밋 관중석 | 환호·야유·불꽃놀이 (Web Audio 합성) + 큰 이모지 | `git push`/CI/PR 머지 결과를 `notify`로 알린다 |
+| rm -rf 결재 보고 | "사장님, ... 해도 되겠습니까?" → 승인/반려 (버튼·음성) | Claude Code 훅이 위험 명령을 결재가 날 때까지 붙잡는다 |
 
 - PC: Python 3.9+, **표준 라이브러리만** (PC 음성 인식을 원할 때만 `faster-whisper` 선택 설치)
 - 폰: Chrome에서 여는 HTML 한 장 (빌드 없음). 음성 인식은 기본적으로 **폰 브라우저의 Web Speech API(ko-KR)**, 말하기는 `speechSynthesis`
@@ -43,6 +46,11 @@ python -m sidekick serve --config config.json
 | `alarm.max_ring_minutes` | 이 시간이 지나면 알람은 스스로 멈춤 (기본 60분) |
 | `alarm.fallback_camera_seconds` | 수동 모드에서 카메라를 켜고 버텨야 하는 시간 |
 | `butler.providers` | 귀가 요약에 들어갈 provider 목록 (아래 참고) |
+| `departure.providers` | 출발 체크리스트 provider 목록 (아래 참고) |
+| `stadium.max_per_minute` / `min_interval_seconds` / `big_pr_lines` | 관중석 레이트 리밋, "큰 PR" 기준 줄 수 |
+| `approval.*` | 결재 보고 훅 설정 (시간 제한, 시간 초과/서버 없음 처리, 위험 패턴) — 아래 참고 |
+| `say.*` | 외부 프로그램용 `POST /api/say` (분당 횟수, 최대 글자 수) |
+| `forward_events` | (선택, 기본 빈 목록) 폰 버튼 이벤트를 보낼 로컬 주소 |
 | `stt` | PC 음성 인식(faster-whisper) 설정. RTX 5080이면 `device: cuda`, `compute_type: float16` |
 
 ## 2. S21에서 열기 (Tailscale HTTPS 권장)
@@ -102,6 +110,106 @@ PC에서 듣고 싶다면 `pip install faster-whisper` 후 "PC 음성 인식"을
 
 새 provider는 `sidekick/butler.py`에 `def my_provider(opts, now) -> str | None` 을 만들고 `PROVIDERS`에 등록하면 끝입니다.
 
+### 현관 출발 체크
+- **출발** 탭 → **나 간다** 버튼, 또는 **출발 모션 감지 켜기** (귀가 집사와 같은 모션 감지, 카메라는 한 번에 하나만 켜짐). 모션은 `departure.cooldown_seconds` 쿨다운.
+- PC는 `departure.providers`를 차례로 돌려 `intro` + 항목들 + `outro`("다녀오세요!")를 말하게 하고, 폰 화면에 항목 목록을 보여줍니다. 귀가 집사와 **같은 provider 구조**라 서로 바꿔 끼울 수 있고, 어떤 provider든 `"enabled": false`로 끌 수 있습니다.
+
+| provider | 내용 |
+|---|---|
+| `open_meteo` | Open-Meteo 날씨 (API 키 불필요). **기본 꺼짐** — 네트워크가 필요하므로 `enabled: true`와 `latitude`/`longitude`를 넣어야 동작. 강수확률이 `umbrella_threshold`(기본 50%) 이상이면 "우산 챙기세요". 실패하면 조용히 생략 |
+| `calendar_next` | 같은 .ics 파서로 **오늘 아직 시작 안 한 첫 일정** + 종일 일정 (`grace_minutes`분 전까지는 아직 '다가오는' 것으로 봄) |
+| `reminders` | 고정 항목: `["지갑", "우산", "에어컨 껐는지"]`. 요일 한정은 `{"text": "분리수거", "weekdays": [0, 3]}` (0=월) |
+| `gpu_busy` | (선택, 기본 꺼짐) `nvidia-smi --query-gpu=name,utilization.gpu ...`를 **인자 리스트**로 실행해 사용률이 `threshold`% 이상이면 "PC가 아직 일하는 중이에요". `nvidia_smi`로 실행 파일 경로 지정 가능. 없으면 생략 |
+
+### 커밋 관중석
+PC에서 이렇게 부르면 폰이 반응합니다 (토큰은 config에서 읽음):
+
+```bash
+python -m sidekick notify push_ok --detail main      # 환호 🎉
+python -m sidekick notify push_fail                  # 야유 👎
+python -m sidekick notify ci_fail --detail "unit"    # 야유 🍅
+python -m sidekick notify ci_ok                      # 환호 ✅
+python -m sidekick notify pr_merged --detail "PR 12" --lines 840   # 불꽃놀이 🎆 (big_pr_lines 미만이면 박수 👏)
+```
+
+- 소리는 폰에서 **Web Audio로 합성**합니다 (필터 건 노이즈 + 수십 개의 발진기로 만든 웅성임·박수·"우우우"·쉬익-펑). 녹음 파일이나 저작권 있는 음원은 없습니다. 소리 + 진동 + 화면 가득 이모지 애니메이션 + 한 줄 대사.
+- **레이트 리밋**: 분당 `max_per_minute`회(기본 4), 최소 `min_interval_seconds`초(기본 3) 간격. 넘치면 서버는 429, CLI는 "건너뜀"을 출력하고 **종료 코드 0** (git 흐름을 깨지 않게). 서버가 없거나 토큰이 틀리면 1, 설정 오류는 2.
+- 설정 파일은 `--config` > `$SIDEKICK_CONFIG` > **이 저장소 루트의 `config.json`** 순서로 찾습니다 (git 명령은 다른 저장소에서 돌기 때문). `$SIDEKICK_URL`, `$SIDEKICK_TOKEN` 또는 `--url`, `--token`으로 덮어쓸 수 있습니다.
+- **git과 연결**: pre-push 훅은 push가 *성공했는지* 모릅니다. 그래서 `git push`를 감싸는 함수를 씁니다.
+  - PowerShell: `$PROFILE`에 `. C:\dev\s21-sidekick\examples\git\sidekick-git.ps1` → `gpush`, `gci`(gh로 최근 Actions 결과 대기), `gmerge 12 --squash`
+  - bash/zsh: `source .../examples/git/sidekick-git.sh` → 같은 함수들 (`SIDEKICK_DIR` 지정)
+  - 가장 단순하게는 `git push && python -m sidekick notify push_ok || python -m sidekick notify push_fail`
+- 관중석 탭의 테스트 버튼으로 소리를 미리 들어볼 수 있습니다 (레이트 리밋 적용).
+
+### rm -rf 결재 보고
+Claude Code가 위험한 명령을 실행하려 하면 폰이 묻습니다: **"사장님, 강제 재귀 삭제: rm -rf ./build 해도 되겠습니까?"** 화면에는 큰 **승인 / 반려** 버튼과 명령 전체가 뜨고, 말로도 답할 수 있습니다 ("ㅇㅇ / 응 / 해 / 승인" ↔ "안 돼 / 아니 / 반려"; 반려 단어가 섞이면 반려 우선, 못 알아들으면 다시 물음 — 자동 승인은 없음).
+
+Claude Code `settings.json` (사용자 `~/.claude/settings.json` 또는 프로젝트 `.claude/settings.json`; 예시는 `examples/claude/settings.json`):
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          { "type": "command",
+            "command": "python C:/dev/s21-sidekick/hooks/claude_pretooluse.py",
+            "timeout": 60 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+(`pip install -e .` 했다면 `"command": "python -m sidekick hook"`도 됩니다. 설정 파일을 따로 두려면 `--config C:/.../config.json` 또는 `SIDEKICK_CONFIG`.)
+
+동작:
+1. 훅은 stdin의 JSON에서 `tool_name`과 `tool_input.command`를 읽습니다. `approval.tools`(기본 `Bash`, `PowerShell`)가 아니거나 위험 패턴에 안 걸리면 **아무것도 출력하지 않고 바로 종료 코드 0** — 평소대로 진행되고 서버에도 안 붙습니다.
+2. 걸리면 서버에 결재를 올리고(`/api/approval/request`) 답을 롱폴링으로 기다립니다(`/api/approval/wait`).
+3. 결과 출력
+   - **승인**: stdout에 `{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow", "permissionDecisionReason": "..."}}`, 종료 코드 0. Claude Code 자체 확인 창도 건너뜁니다. 그것까지 보고 싶으면 `allow_style: "passthrough"` (출력 없이 0 → 원래 권한 흐름).
+   - **반려 / 시간 초과 / 서버 없음**: 기본 `deny_style: "exit2"` = stderr에 이유 + **종료 코드 2**. 훅 JSON 형식이 버전마다 달라도 확실히 막히는 방식입니다 (이유는 Claude에게 전달됨). `deny_style: "json"`이면 `permissionDecision: "deny"` JSON + 종료 코드 0.
+   - `on_timeout: "ask"` 또는 `fail_open: true`일 때는 `permissionDecision: "ask"` JSON → Claude Code의 원래 확인 창으로 넘깁니다. **시간 초과·서버 없음에서 자동 승인하는 옵션은 일부러 없습니다.**
+4. 실패 시 닫힘: 위험 명령으로 판정된 뒤에는 서버 연결 실패, 토큰 오류, 훅 내부 예외까지 전부 **막음**(종료 코드 2). 훅 입력 JSON이 깨졌으면 원문 전체를 패턴 검사해서 위험해 보이면 막습니다.
+5. `timeout_seconds` 기본 45초. **Claude Code의 훅 제한 시간(기본 60초)보다 짧아야 합니다** — 제한에 걸려 훅이 죽으면 차단으로 처리되지 않을 수 있으니, 늘릴 때는 settings.json의 `timeout`도 같이 늘리세요.
+
+기본 위험 패턴 (`sidekick/hook.py`의 `DEFAULT_PATTERNS`; `approval.risky_patterns`로 교체, `extra_patterns`로 추가 — `"정규식"` 또는 `{"pattern": ..., "label": ...}`):
+
+| 라벨 | 예 |
+|---|---|
+| 강제 재귀 삭제 | `rm -rf`, `rm -fr`, `rm -r -f`, `rm --recursive`, `sudo /bin/rm -Rf` (`rm -f 파일 하나`는 통과) |
+| git 강제 푸시 | `git push --force`, `-f`, `--force-with-lease`, `+main` |
+| git reset --hard / git clean | `git reset --hard`, `git clean -fdx` |
+| DB 테이블 삭제 | `DROP TABLE/DATABASE/SCHEMA`, `TRUNCATE TABLE` (대소문자 무시) |
+| 윈도우 강제 삭제 | `del /s`, `rd /s`, `rmdir /S /Q` |
+| PowerShell 재귀 삭제 | `Remove-Item -Recurse`, `ri x -r` |
+| 기타 | `find ... -delete`, `shutil.rmtree`, `mkfs`, `format D:`, `dd of=/dev/...` |
+
+**매칭 방식에 대한 선택**: 셸 문법을 해석하지 않고 **원문 텍스트**에 정규식을 겁니다(`;`, `&&`, `|`, 줄바꿈으로 구간을 나누고, `\`+줄바꿈 이어쓰기는 합침). 그래서 `rm -rf ./build`는 물론 `echo "rm -rf"`도 걸립니다. 따옴표 안을 빼 주면 `bash -c "rm -rf x"`나 `eval "..."`처럼 실제로 실행되는 경우를 놓치기 때문에, **오탐(한 번 더 물어봄)을 미탐(그냥 지워짐)보다 택했습니다.** `git rm -r --cached`도 걸립니다. 반대로 `$RM -rf`, 스크립트 파일 안의 삭제, 패턴에 없는 도구는 못 잡습니다. 이건 보조 안전장치지 샌드박스가 아닙니다.
+
+폰은 **승인/반려 표시만** 할 수 있습니다. 폰에서 온 어떤 글자도 실행되지 않고, 실행 여부는 Claude Code가 결정합니다. 첫 결정만 유효하며, 대기 중인 결재는 최대 `max_pending`개(기본 10).
+
+### 다른 프로그램과 연결 (`/api/say`, 이벤트 전달)
+- **폰에 말 시키기**: 다른 로컬 프로젝트(예: `life-nagger`)가
+
+  ```
+  POST /api/say   X-Sidekick-Token: <토큰>   (또는 Authorization: Bearer <토큰>)
+  {"text": "물 마실 시간이에요.", "module": "nagger-mombot"}
+  ```
+
+  를 보내면 내부 `events.say(...)`와 똑같은 "say" 이벤트가 쌓이고 폰이 읽습니다. 응답 `{"ok": true, "id": <이벤트 번호>, "text": <정리된 문장>}`. 제어 문자·양방향 제어 문자는 공백으로 바꾸고, `say.max_chars`(기본 300자)에서 자르며, `module`은 영문/숫자/`_.-`만 남깁니다(기본 `external`). 분당 `say.max_per_minute`회(기본 12), 최소 1초 간격, 넘치면 429. `say.enabled: false`면 403.
+- **폰 버튼 → 다른 프로그램 (선택, 기본 꺼짐)**: `config.json`에
+
+  ```json
+  "forward_events": [
+    {"url": "http://127.0.0.1:8799/api/event", "token_env": "NAGGER_EVENTS_TOKEN", "types": ["sigh"]}
+  ]
+  ```
+
+  를 넣으면 디버거 탭에 "😮‍💨 한숨" 같은 버튼이 생기고, 누르면 폰 → `POST /api/phone_event {"type": "sigh"}` → PC가 위 주소로 `{"type": "sigh", "n": 1}`을 `X-Sidekick-Token: $NAGGER_EVENTS_TOKEN` 헤더와 함께 보냅니다 (`token`으로 직접 적어도 됨, `types` 생략 시 `["sigh"]`). **보낼 주소는 PC 설정에서만** 정해지고 폰은 `types`에 있는 이름만 고를 수 있습니다. 비어 있으면 아무 데도 안 보냅니다.
+
 ## 4. API
 
 모든 `/api/*`는 `X-Sidekick-Token: <token>` (또는 `Authorization: Bearer`) 헤더가 필요합니다. `/`(폰 페이지)는 비밀이 없으므로 토큰 없이 열립니다.
@@ -116,6 +224,14 @@ PC에서 듣고 싶다면 `pip install faster-whisper` 후 "PC 음성 인식"을
 | POST | `/api/alarm/snooze`, `/api/alarm/emergency {"code"}`, `/api/alarm/answer {"answer"}` | 스누즈 / 비상 해제 / 산수 답 |
 | POST | `/api/alarm/set {"time":"07:00"}`, `/api/alarm/test` | 시각 변경 / 지금 울리기 |
 | POST | `/api/arrival {"source":"motion"\|"button"}` | 귀가 |
+| POST | `/api/departure {"source":"motion"\|"button"}` | 출발 체크 (`items` 목록도 반환) |
+| POST | `/api/notify {"event", "detail"?, "lines"?}` | 커밋 관중석 (429 = 레이트 리밋) |
+| POST | `/api/approval/request {"command","label","description","tool","cwd","timeout_seconds"}` | 결재 올리기 (훅이 사용) |
+| GET | `/api/approval/wait?id=&wait=25` | 결재 결과 롱폴링: `pending`/`allow`/`deny`/`expired` |
+| POST | `/api/approval/decide {"id", "decision":"allow"\|"deny"}` 또는 `{"id", "utterance"}` | 폰의 승인/반려 (음성은 서버가 해석, 못 알아들으면 `understood:false`) |
+| GET | `/api/approval/pending` | 대기 중인 결재 (폰이 늦게 켜져도 보이게) |
+| POST | `/api/say {"text", "module"?}` | 외부 프로그램이 폰에 말 시키기 |
+| POST | `/api/phone_event {"type", "n"?}` | 폰 버튼 이벤트를 `forward_events`로 전달 |
 | GET | `/api/config`, `/api/ping` | 폰 페이지 초기화 / 연결 확인 |
 
 ## 5. 프라이버시·보안
@@ -124,6 +240,8 @@ PC에서 듣고 싶다면 `pip install faster-whisper` 후 "PC 음성 인식"을
 - **기본적으로 아무것도 저장하지 않습니다.** 사진은 판정 후 버려지고, PC 음성 인식 오디오는 임시 파일을 바로 지우며, 서버 접속 로그에는 경로만 남고 발화 내용은 남지 않습니다. 이벤트 큐(최근 100개 문장)는 메모리에만 있습니다.
 - 폰에서 온 글자는 **절대 명령으로 실행하지 않습니다.** 실행되는 건 `config.json`에 미리 적어 둔 명령뿐이고, 발화는 `shell=False`로 인자 하나 안의 데이터로만 들어갑니다 (`str.format`도 쓰지 않음).
 - 토큰은 상수 시간 비교, 요청 크기 제한(`server.max_body_mb`), 기본 바인딩은 localhost.
+- 결재 보고: 폰은 승인/반려만 표시할 수 있고 아무것도 실행하지 않습니다. `notify`·훅은 **현재 폴더의 config.json을 읽지 않습니다** (훅은 남의 저장소 안에서 돌기 때문에, 그 저장소가 심어 둔 설정이 위험 패턴이나 `fail_open`을 바꾸지 못하게).
+- 바깥으로 나가는 요청은 직접 켠 것뿐: `vision`/`llm`, `open_meteo`(기본 꺼짐), `forward_events`(기본 비어 있음).
 - `config.json`에는 토큰과 비상 코드가 있으니 커밋하지 마세요 (`.gitignore`에 포함).
 
 ## 6. 테스트
@@ -132,11 +250,10 @@ PC에서 듣고 싶다면 `pip install faster-whisper` 후 "PC 음성 인식"을
 python3 -m unittest discover -s tests -v
 ```
 
-외부 네트워크 없이 돌아갑니다. Node + Playwright(Chromium)가 있으면 `test_page_smoke`가 실제 브라우저로 폰 페이지를 띄워 JS 오류 없이 디버거·알람(가짜 카메라)·집사 흐름이 도는지 확인하고, 없으면 건너뜁니다.
+외부 네트워크 없이 돌아갑니다 (날씨는 가짜 fetch, nvidia-smi는 가짜 runner, 서버는 포트 0). Node + Playwright(Chromium)가 있으면 `test_page_smoke`가 실제 브라우저로 폰 페이지를 띄워 JS 오류 없이 디버거·알람(가짜 카메라)·집사·출발·관중석 흐름이 도는지 보고, 마지막에 **진짜 훅**으로 `rm -rf ./build` 결재를 올려 폰 화면에서 승인 버튼을 눌러 훅이 `allow` JSON을 내는지까지 확인합니다. 없으면 건너뜁니다.
 
 ## 7. 로드맵 (다음 모듈 후보)
 
 - **전화 대행**: 스피커폰으로 걸려온 전화를 듣고 요약하거나, 정해진 대본으로 대신 응대 (예약 확인 등)
 - **현실판 Screenpipe**: 책상 위 장면·대화를 (명시적으로 켰을 때만) 기록하고 "아까 내가 뭐라고 했지?"에 답하기
-- **커밋 관중석**: Claude Code 훅이 테스트 통과/커밋/PR 머지를 알리면 폰이 환호하거나 야유하는 관중이 되기
 - 그 밖에: 실제 날씨·택배 provider, 반복 일정(RRULE) 지원, 음성 웨이크워드

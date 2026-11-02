@@ -15,12 +15,24 @@
     "model": "local"
   },
   "debugger": {
-    "triggers": ["왜 안 돼", "왜 안되지", "왜 이래", "에러 뭐야", "오류 뭐야", "뭐가 문제야", "또 터졌네"],
+    "triggers": [
+      "왜 안 돼",
+      "왜 안되지",
+      "왜 이래",
+      "에러 뭐야",
+      "오류 뭐야",
+      "뭐가 문제야",
+      "또 터졌네"
+    ],
     "cooldown_seconds": 60,
     "mode": "log_tail",
     "log_file": "C:/dev/myapp/logs/dev.log",
     "tail_lines": 200,
-    "command": ["claude", "-p", "{prompt}"],
+    "command": [
+      "claude",
+      "-p",
+      "{prompt}"
+    ],
     "cwd": "C:/dev/myapp",
     "timeout_seconds": 180
   },
@@ -37,13 +49,99 @@
   "butler": {
     "cooldown_seconds": 600,
     "providers": [
-      {"name": "greeting"},
-      {"name": "calendar_ics", "path": "C:/Users/me/calendar.ics"},
-      {"name": "claude_status", "path": "C:/Users/me/.sidekick/claude_status.txt"},
-      {"name": "weather"},
-      {"name": "delivery"}
+      {
+        "name": "greeting"
+      },
+      {
+        "name": "calendar_ics",
+        "path": "C:/Users/me/calendar.ics"
+      },
+      {
+        "name": "claude_status",
+        "path": "C:/Users/me/.sidekick/claude_status.txt"
+      },
+      {
+        "name": "weather"
+      },
+      {
+        "name": "delivery"
+      }
     ],
-    "motion": {"threshold": 18, "min_changed_ratio": 0.08}
+    "motion": {
+      "threshold": 18,
+      "min_changed_ratio": 0.08
+    }
   },
-  "stt": {"model": "small", "device": "cuda", "compute_type": "float16", "language": "ko"}
+  "departure": {
+    "cooldown_seconds": 300,
+    "providers": [
+      {
+        "name": "open_meteo",
+        "enabled": false,
+        "latitude": 37.5665,
+        "longitude": 126.978,
+        "umbrella_threshold": 50
+      },
+      {
+        "name": "calendar_next",
+        "path": "C:/Users/me/calendar.ics"
+      },
+      {
+        "name": "reminders",
+        "items": [
+          "지갑",
+          "열쇠",
+          "에어컨 껐는지",
+          {
+            "text": "분리수거",
+            "weekdays": [
+              0,
+              3
+            ]
+          }
+        ]
+      },
+      {
+        "name": "gpu_busy",
+        "enabled": false,
+        "threshold": 30
+      }
+    ]
+  },
+  "stadium": {
+    "enabled": true,
+    "max_per_minute": 4,
+    "min_interval_seconds": 3,
+    "big_pr_lines": 300
+  },
+  "approval": {
+    "enabled": true,
+    "timeout_seconds": 45,
+    "on_timeout": "deny",
+    "fail_open": false,
+    "tools": [
+      "Bash",
+      "PowerShell"
+    ],
+    "extra_patterns": [
+      {
+        "pattern": "\\bkubectl\\s+delete\\b",
+        "label": "쿠버네티스 삭제"
+      }
+    ],
+    "allow_style": "json",
+    "deny_style": "exit2"
+  },
+  "say": {
+    "enabled": true,
+    "max_per_minute": 12,
+    "max_chars": 300
+  },
+  "forward_events": [],
+  "stt": {
+    "model": "small",
+    "device": "cuda",
+    "compute_type": "float16",
+    "language": "ko"
+  }
 }

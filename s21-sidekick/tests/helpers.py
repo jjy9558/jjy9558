@@ -50,3 +50,45 @@ def config(**sections):
     for k, v in sections.items():
         raw.setdefault(k, {}).update(v)
     return build_config(raw)
+
+
+class LiveServer:
+    """테스트용: 포트 0으로 실제 HTTP 서버를 띄운다."""
+
+    def __init__(self, app):
+        import threading
+        from sidekick.server import make_server
+        self.app = app
+        self.srv = make_server(app, "127.0.0.1", 0, quiet=True)
+        self.base = "http://127.0.0.1:%d" % self.srv.server_address[1]
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.srv.shutdown()
+        self.srv.server_close()
+
+    def call(self, path, body=None, token="secret-token"):
+        import json
+        import urllib.error
+        import urllib.request
+        data = json.dumps(body).encode() if body is not None else None
+        req = urllib.request.Request(self.base + path, data=data, method="POST" if data is not None else "GET")
+        if token:
+            req.add_header("X-Sidekick-Token", token)
+        if data is not None:
+            req.add_header("Content-Type", "application/json")
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                return r.status, json.loads(r.read() or b"{}")
+        except urllib.error.HTTPError as e:
+            return e.code, json.loads(e.read() or b"{}")
+
+
+def free_port():
+    """닫힌(아무도 안 듣는) 포트 번호."""
+    import socket
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port

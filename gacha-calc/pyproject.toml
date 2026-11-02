@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gachacalc"
+version = "0.1.0"
+description = "가챠 천장 환율 판정기 + 게임 시간 시급 명세서"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+gachacalc = "gachacalc.cli:main"
+
+[tool.setuptools]
+packages = ["gachacalc"]

@@ -1,0 +1,11 @@
+{
+  "name": "[예시 C] 확정형",
+  "label": "EXAMPLE: 가상의 수치, 실제 게임과 무관",
+  "base_rate_pct": 0.8,
+  "soft_pity_start": 65,
+  "soft_pity_increase_pct": 4.0,
+  "hard_pity": 80,
+  "rule": "guarantee",
+  "cost_per_pull": 200,
+  "currency_name": "다이아"
+}

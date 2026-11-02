@@ -1,0 +1,11 @@
+{
+  "name": "[예시 B] 짧은 천장형",
+  "label": "EXAMPLE: 가상의 수치, 실제 게임과 무관",
+  "base_rate_pct": 1.0,
+  "soft_pity_start": 60,
+  "soft_pity_increase_pct": 5.0,
+  "hard_pity": 70,
+  "rule": "50/50",
+  "cost_per_pull": 100,
+  "currency_name": "크리스탈"
+}

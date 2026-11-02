@@ -1,0 +1,11 @@
+{
+  "name": "[예시 A] 표준 천장형",
+  "label": "EXAMPLE: 가상의 수치, 실제 게임과 무관",
+  "base_rate_pct": 0.6,
+  "soft_pity_start": 74,
+  "soft_pity_increase_pct": 6.0,
+  "hard_pity": 90,
+  "rule": "50/50",
+  "cost_per_pull": 160,
+  "currency_name": "젬"
+}

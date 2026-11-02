@@ -38,5 +38,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
+      - name: Check jjkit copies are up to date
+        run: python tools/jjkit_sync.py --check-all
+
       - name: Run all tests
         run: python run_all_tests.py

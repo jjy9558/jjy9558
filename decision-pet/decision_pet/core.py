@@ -118,6 +118,8 @@ def bury(task, now, reason):
 
 
 def epitaph(task):
+    if task.get("bury_reason") == "vjournal":
+        return "여기 잠들다: 선언했다가 포기 (%s, %s)" % (task.get("declared_day") or "?", task.get("raw") or task["title"])
     created = parse_dt(task["created"]).strftime(DATE_FMT)
     buried = parse_dt(task["buried_at"]).strftime(DATE_FMT) if task.get("buried_at") else "?"
     return "여기 잠들다: %s (%s~%s, 미룬 횟수 %d)" % (
@@ -279,6 +281,28 @@ class Pet:
         self.save()
         return t, bool(r)
 
+    # -- voice-journal 묘지 가져오기
+    def import_vjournal(self, db_path):
+        from .vjournal_import import read_abandoned
+        found = read_abandoned(db_path, self.now().date())
+        existing = {t.get("source_key") for t in self.state["tasks"]}
+        added = []
+        for g in found:
+            key = "vjournal:%d" % g["id"]
+            if key in existing:
+                continue
+            t = new_task(self.state["next_id"], g["title"], 15, ["vjournal"], self.now())
+            self.state["next_id"] += 1
+            t.update(status="buried", buried_at=fmt(self.now()), bury_reason="vjournal",
+                     source_key=key, declared_day=g["declared_day"], raw=g["raw"],
+                     created=g["declared_day"] + "T00:00:00")
+            self.state["tasks"].append(t)
+            existing.add(key)
+            added.append(t)
+        if added:
+            self.save()
+        return added
+
     # -- graveyard
     def graveyard(self):
         return sorted(self.tasks("buried"), key=lambda t: t["buried_at"] or "")
@@ -304,6 +328,30 @@ class Pet:
         self.state["experiment_log"][today] = {"text": text, "done": True}
         self.save()
         return text
+
+    # -- 의회 / 점심
+    def record_council(self, result):
+        rec = {
+            "id": self.state["next_decision_id"], "at": fmt(self.now()), "mode": "council",
+            "options": ["하자", "말자"], "choice": "하자" if result["verdict"] == "가결" else "말자",
+            "reason": "%s: %s (찬성 %d : 반대 %d)" % (result["question"], result["verdict"],
+                                                  result["yes"], result["no"]),
+            "satisfaction": None, "dismissed": False,
+        }
+        self.state["next_decision_id"] += 1
+        self.state["decisions"].append(rec)
+        self.save()
+        return rec
+
+    def lunch(self, menu=None):
+        from .lunch import pick_lunch
+        lu = self.state["lunch"]
+        if menu:
+            lu["menu"] = list(menu)
+        choice, excluded = pick_lunch(lu["menu"], lu["history"], self.rng)
+        lu["history"] = (lu["history"] + [choice])[-20:]
+        self.save()
+        return choice, excluded
 
     # -- decisions
     def decide(self, options, mode="coin", criteria=None, scores=None):

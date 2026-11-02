@@ -25,8 +25,15 @@ def _build_parser():
 
     dc = sub.add_parser("decide", help="결정해줘 (2~5개 선택지)")
     dc.add_argument("options", nargs="+", help='"라면" "김밥" "굶기" 또는 "라면 vs 김밥"')
-    dc.add_argument("--mode", choices=["coin", "score", "llm"], default="coin")
+    dc.add_argument("--mode", choices=["coin", "score", "llm", "council"], default="coin")
     dc.add_argument("--criteria", default="", help='점수표 기준 "맛:3,가격:2" (2~3개, 이름:가중치)')
+
+    dc.add_argument("--llm", action="store_true", help="council: 로컬 LLM 으로 발언 말투 다듬기 (실패하면 템플릿)")
+    for flag, key in (("--cool-off", "cool_off"), ("--steam-buddy", "steam_buddy"),
+                      ("--life-nagger", "life_nagger"), ("--voice-journal", "voice_journal"),
+                      ("--paper-butler", "paper_butler")):
+        dc.add_argument(flag, dest="src_" + key, default="", metavar="PATH",
+                        help="council: %s 데이터 경로 (기본: config.sources 또는 프로젝트 기본 위치)" % key)
 
     g = sub.add_parser("graveyard", help="안 한 일 묘지")
     g.add_argument("--resurrect", type=int, metavar="ID", help="부활시키기")
@@ -35,6 +42,13 @@ def _build_parser():
     sub.add_parser("experiment-done", help="오늘의 실험 완료 표시")
     sub.add_parser("followup", help="지난 결정 만족도 묻기")
     sub.add_parser("history", help="만족도 기록")
+
+    iv = sub.add_parser("import-vjournal", help="voice-journal 에서 포기한 선언을 묘지로 (읽기 전용)")
+    iv.add_argument("db")
+
+    lu = sub.add_parser("lunch", help="점심 운명 로딩")
+    lu.add_argument("--menu", default="", help='후보 "김치찌개,라면,돈까스" (한 번 주면 저장)')
+    lu.add_argument("--no-anim", action="store_true", help="로딩 애니메이션 생략")
 
     i = sub.add_parser("import-todos", help="마크다운의 '- [ ]' 항목 가져오기")
     i.add_argument("file")
@@ -52,6 +66,21 @@ def _parse_criteria(text):
         name, _, w = part.partition(":")
         out.append((name.strip(), float(w) if w.strip() else 1.0))
     return out
+
+
+def _council(args, pet, out):
+    from . import council
+    question = " ".join(args.options)
+    overrides = {k: getattr(args, "src_" + k) for k in council.SOURCE_KEYS}
+    paths = council.resolve_paths(pet.config.get("sources"), overrides)
+    evidence = council.collect(paths, pet.now().date())
+    result = council.convene(question, evidence, pet.config.get("council"))
+    if args.llm:
+        council.phrase_with_llm(result, pet.config["llm"], pet.opener)
+    for line in council.render(result):
+        out(line)
+    pet.record_council(result)
+    return 0
 
 
 def run(argv, pet=None, out=print, inp=input):
@@ -113,6 +142,8 @@ def run(argv, pet=None, out=print, inp=input):
     elif args.cmd == "decide":
         options = args.options
         criteria = scores = None
+        if args.mode == "council":
+            return _council(args, pet, out)
         try:
             if len(options) == 1:
                 from .decide import parse_options
@@ -148,6 +179,30 @@ def run(argv, pet=None, out=print, inp=input):
             out("묘지가 비어 있어요. 평화롭네요.")
         for t in graves:
             out("#%d 🪦 %s" % (t["id"], epitaph(t)))
+
+    elif args.cmd == "import-vjournal":
+        try:
+            added = pet.import_vjournal(args.db)
+        except ValueError as e:
+            out(str(e))
+            return 1
+        out("%d개를 묘지에 묻었어요." % len(added))
+        for t in added:
+            out("  #%d 🪦 %s" % (t["id"], epitaph(t)))
+
+    elif args.cmd == "lunch":
+        from .lunch import animate, parse_menu
+        try:
+            choice, excluded = pet.lunch(parse_menu(args.menu) if args.menu else None)
+        except ValueError as e:
+            out(str(e))
+            return 1
+        if args.no_anim:
+            out("오늘의 점심 운명: %s" % choice)
+        else:
+            animate(choice, pet.rng, sys.stdout.write, flush=sys.stdout.flush)
+        if excluded:
+            out("(최근에 먹은 %s은(는) 제외했어요)" % ", ".join(excluded))
 
     elif args.cmd == "experiment":
         write_default_experiments(pet.store.experiments_path)

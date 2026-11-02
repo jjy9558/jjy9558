@@ -14,3 +14,6 @@ steam-buddy = "steam_buddy.cli:main"
 
 [tool.setuptools]
 packages = ["steam_buddy"]
+
+[tool.setuptools.package-data]
+steam_buddy = ["data/*.json"]

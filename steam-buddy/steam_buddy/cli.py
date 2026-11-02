@@ -1,13 +1,15 @@
 """명령줄 인터페이스. `python -m steam_buddy <명령>` 으로 실행한다."""
 
 import argparse
+import json
 import re
 import sys
 import time
 import unicodedata
 from datetime import datetime, timedelta
+from pathlib import Path
 
-from . import core
+from . import compat, core
 from .notify import send_ntfy
 from .steam import SteamClient, SteamError
 from .store import Store
@@ -57,7 +59,7 @@ def parse_when(s, now):
 # ---------- 앱 ----------
 
 class App:
-    def __init__(self, store=None, client=None, now=None, out=None, push=send_ntfy, sleep=time.sleep, delay=0.3):
+    def __init__(self, store=None, client=None, now=None, out=None, push=send_ntfy, sleep=time.sleep, delay=0.3, compat_db=None):
         self.store = store or Store()
         self.client = client or SteamClient()
         self._now = now
@@ -65,6 +67,14 @@ class App:
         self.push = push
         self._sleep = sleep
         self.delay = delay  # 연속 API 호출 사이 대기(초). 테스트에서는 0
+        self._compat = compat_db
+
+    @property
+    def compat(self):
+        # 사용자 compat.json은 data.json과 같은 폴더(STEAM_BUDDY_HOME)에 둔다
+        if self._compat is None:
+            self._compat = compat.CompatDB(self.store.path.parent / "compat.json")
+        return self._compat
 
     def now(self):
         return self._now() if callable(self._now) else (self._now or datetime.now())
@@ -127,6 +137,13 @@ class App:
             for r in risk["reasons"]:
                 self.say(f"     - {r}")
 
+        ce = self.compat.get(appid)
+        if ce:
+            for label, val in compat.summary_lines(ce):
+                self.say(f"  {_pad(label, 9)} {val}")
+        else:
+            self.say("  스팀덱    정보 없음 (compat set 으로 직접 기록할 수 있어요)")
+
         owned = self.store.get(appid)
         if owned:
             self.say(f"  📌 이미 기록된 게임이에요 ({owned['purchased_at'][:10]} 구매).")
@@ -138,6 +155,10 @@ class App:
             warn.append("평가가 갈림")
         if risk and risk["level"] == "높음":
             warn.append("방치 위험 높음")
+        if ce and ce.get("deck") == "unsupported":
+            warn.append("스팀덱 미지원")
+        if ce and (ce.get("anticheat") or {}).get("linux") == "no":
+            warn.append("안티치트가 리눅스 미지원")
         if d["discount"] == 0 and d["price"]:
             warn.append("할인 중 아님 (급하지 않으면 세일 대기)")
         verdict = "괜찮아 보여요. 사면 2시간 안에 판단해 보세요." if not warn else "고민 포인트: " + ", ".join(warn)
@@ -450,6 +471,86 @@ class App:
         self.say(f"\n{len(cands)}개 확인, {len(found)}개가 조건에 맞아요. (점수 = 윌슨하한 70% + 긍정비율 30%)")
         return 0
 
+    # ----- 호환 정보 (스팀덱 / 안티치트 / 핸드헬드 프리셋) -----
+    def _compat_appid(self, query):
+        q = str(query).strip()
+        if q.isdigit() and int(q) > 0:
+            return int(q)
+        return self.resolve_local(q)["appid"]
+
+    def _compat_name(self, appid, e=None):
+        g = self.store.get(appid)
+        return (e or {}).get("name") or (g["name"] if g else "")
+
+    def cmd_compat(self, a):
+        if a.action == "set":
+            return self._compat_set(a)
+        return self._compat_show(a)
+
+    def _compat_set(self, a):
+        appid = self._compat_appid(a.game)
+        ac = {k: v for k, v in (("kind", a.anticheat), ("linux", a.ac_linux), ("deck", a.ac_deck)) if v is not None}
+        pr = {k: v for k, v in (("tdp_w", a.tdp), ("fps_cap", a.fps), ("resolution", a.resolution),
+                                ("fsr", a.fsr), ("graphics_notes", a.gfx)) if v is not None}
+        if not (ac or pr or a.deck or a.note is not None or a.name):
+            raise ValueError("바꿀 항목이 없어요. --deck, --anticheat, --tdp 등을 지정하세요.")
+        self.compat.update(appid, name=a.name, deck=a.deck, note=a.note, anticheat=ac or None, preset=pr or None)
+        self.say(f"{appid} 호환 정보를 저장했어요. ({self.compat.user_path})")
+        return 0
+
+    def _compat_show(self, a):
+        if a.game:
+            appid = self._compat_appid(a.game)
+            e = self.compat.get(appid)
+            if not e:
+                self.say(f"{appid}: 기록된 호환 정보가 없어요. compat set 으로 추가하세요.")
+                return 0
+            self.say(f"\n{self._compat_name(appid, e) or appid}  (appid {appid})")
+            for label, val in compat.summary_lines(e):
+                self.say(f"  {_pad(label, 9)} {val}")
+            return 0
+        ids = self.compat.all_ids()
+        if not ids:
+            self.say("기록된 호환 정보가 없어요.")
+            return 0
+        rows = []
+        for k in ids:
+            e = self.compat.get(k)
+            ac = e.get("anticheat")
+            deck = compat.DECK_LABELS.get(e.get("deck"), "-") + ("*" if e.get("example") else "")
+            rows.append((k, self._compat_name(int(k), e) or "-", deck,
+                         (ac.get("kind", "?") + "/리눅스 " + compat.SUPPORT_LABELS[ac.get("linux", "unknown")]) if ac else "-",
+                         "있음" if e.get("preset") else "-"))
+        table(("appid", "이름", "스팀덱", "안티치트", "프리셋"), rows, self.out)
+        if any(self.compat.get(k).get("example") for k in ids):
+            self.say("* 표시는 예시 데이터예요. 실제 호환 정보가 아니니 직접 확인해서 compat set 으로 덮어쓰세요.")
+        return 0
+
+    def cmd_preset(self, a):
+        appid = self._compat_appid(a.game)
+        if a.action == "export":
+            e = self.compat.get(appid)
+            if not e or not e.get("preset"):
+                raise ValueError(f"{appid}에 저장된 프리셋이 없어요. compat set --tdp ... 로 먼저 만드세요.")
+            text = json.dumps(compat.export_preset(appid, self._compat_name(appid, e), e["preset"]),
+                              ensure_ascii=False, indent=2)
+            if a.out:
+                Path(a.out).write_text(text + "\n", encoding="utf-8")
+                self.say(f"프리셋을 {a.out}에 저장했어요.")
+            else:
+                self.say(text)
+            return 0
+        try:
+            text = sys.stdin.read() if a.file == "-" else Path(a.file).read_text(encoding="utf-8")
+        except OSError as ex:
+            raise ValueError(f"파일을 읽을 수 없어요: {ex}")
+        doc_appid, _name, preset = compat.parse_preset_doc(text)
+        if doc_appid != appid and not a.force:
+            raise ValueError(f"파일의 appid({doc_appid})가 지정한 appid({appid})와 달라요. 그래도 가져오려면 --force")
+        self.compat.set_preset(appid, preset)
+        self.say(f"{appid} 프리셋을 가져왔어요. ({self.compat.user_path})")
+        return 0
+
     def cmd_config(self, a):
         cfg = self.store.config
         changed = False
@@ -521,6 +622,34 @@ def build_parser():
     s.add_argument("--min-ratio", type=float, default=0.9)
     s.add_argument("--korean", action="store_true", help="한국어 지원 게임만")
     s.add_argument("--limit", type=int, default=30, help="확인할 후보 수 상한 (기본 30)")
+
+    s = sub.add_parser("compat", help="스팀덱 호환 등급/안티치트/핸드헬드 메모 기록·보기")
+    cs = s.add_subparsers(dest="action", required=True)
+    t = cs.add_parser("set", help="호환 정보 기록 (사용자 compat.json)")
+    t.add_argument("game", help="appid 또는 기록된 게임 이름")
+    t.add_argument("--name")
+    t.add_argument("--deck", choices=list(compat.DECK_LABELS), help="스팀덱 등급")
+    t.add_argument("--anticheat", help="안티치트 종류 (예: EasyAntiCheat, BattlEye)")
+    t.add_argument("--ac-linux", choices=list(compat.SUPPORT_LABELS), help="안티치트 리눅스 지원")
+    t.add_argument("--ac-deck", choices=list(compat.SUPPORT_LABELS), help="안티치트 스팀덱 지원")
+    t.add_argument("--note", help="호환 메모")
+    t.add_argument("--tdp", type=int, help="TDP(W)")
+    t.add_argument("--fps", type=int, help="FPS 제한")
+    t.add_argument("--resolution", help="해상도, 예: 1280x800")
+    t.add_argument("--fsr", choices=list(compat.FSR_VALUES))
+    t.add_argument("--gfx", help="그래픽 옵션 메모")
+    t = cs.add_parser("show", help="호환 정보 보기 (게임 생략 시 전체 표)")
+    t.add_argument("game", nargs="?")
+
+    s = sub.add_parser("preset", help="핸드헬드 프리셋 JSON 내보내기/가져오기")
+    ps = s.add_subparsers(dest="action", required=True)
+    t = ps.add_parser("export", help="프리셋을 JSON으로 출력")
+    t.add_argument("game")
+    t.add_argument("--out", help="파일로 저장")
+    t = ps.add_parser("import", help="JSON 프리셋 가져오기 (스키마 검사)")
+    t.add_argument("game")
+    t.add_argument("file", help="프리셋 JSON 파일 ('-'이면 표준입력)")
+    t.add_argument("--force", action="store_true", help="파일 안의 appid가 달라도 가져오기")
 
     s = sub.add_parser("config", help="설정 보기/바꾸기")
     s.add_argument("--key", help="Steam Web API 키 (https://steamcommunity.com/dev/apikey)")

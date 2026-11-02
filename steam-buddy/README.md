@@ -7,6 +7,7 @@
 <!-- demo:end -->
 
 - **사기 전** `check`: 가격/할인, 한국어 지원(자막/음성), 리뷰, 얼리액세스 방치 위험 점수
+- **스팀덱/핸드헬드** `check` 출력에 호환 등급, 안티치트(종류, 리눅스/덱 지원), 프리셋 메모 표시 (`compat`, `preset`, 아래 설명)
 - **살 때** `buy`: 구매를 기록하고 환불 기한 추적 시작
 - **산 뒤** `status` / `alert` / `keep`: 환불 기한 현황, 임박 시 폰 알림, 계속 갖기로 결정
 - **돌아보기** `rate` / `report`: 만족도 기록, 시간당 비용, 안 켜본 게임, 후회 목록
@@ -21,7 +22,7 @@ Steam 환불은 **구매 후 14일 이내 AND 플레이 2시간 미만**일 때 
 
 ## 설치
 
-Python 3.9 이상, 외부 패키지 없음. steam-buddy 폴더에서 바로 실행합니다.
+Python 3.12 이상, 외부 패키지 없음. steam-buddy 폴더에서 바로 실행합니다.
 
 ```
 cd steam-buddy
@@ -80,6 +81,32 @@ python -m steam_buddy gems --wishlist          # 실험적, SteamID64 설정 필
 - `--tag`는 장르 이름/게임 이름에 키워드가 들어 있는지 봅니다(스토어 사용자 태그는 아님). `--korean`은 한국어 지원 게임만.
 - API 호출을 아끼려고 후보는 기본 30개까지만 보고(`--limit`), 요청 사이에 0.3초씩 쉽니다. 리뷰 조건을 통과한 게임만 상세 정보를 조회합니다.
 - `--wishlist`는 옛 `wishlistdata` 엔드포인트(첫 페이지만)라 Steam이 막았거나 위시리스트가 비공개면 실패할 수 있습니다. 실패해도 안내 메시지만 내고 다른 후보로 계속합니다.
+
+## 스팀덱 호환 / 안티치트 / 핸드헬드 프리셋 (`compat`, `preset`)
+
+`check`가 가격·리뷰 아래에 스팀덱 등급, 안티치트(종류, 리눅스 지원, 덱 지원), 핸드헬드 프리셋 메모를 보여 줍니다. **네트워크 조회는 하지 않고**, 사용자가 적은 JSON 데이터만 씁니다. 정보가 없으면 "정보 없음"으로 표시합니다. 등급이 `미지원`이거나 안티치트가 리눅스 미지원이면 `check` 결론에 고민 포인트로 추가됩니다.
+
+```
+python -m steam_buddy compat set 1145360 --deck playable --anticheat EasyAntiCheat --ac-linux yes --ac-deck unknown
+python -m steam_buddy compat set 1145360 --tdp 10 --fps 40 --resolution 1280x800 --fsr quality --gfx "그림자 중간"
+python -m steam_buddy compat set Hades --note "첫 실행 때 셰이더 컴파일 오래 걸림"   # 기록된 게임은 이름도 가능
+python -m steam_buddy compat show [appid]           # 생략하면 전체 표
+python -m steam_buddy preset export 1145360 [--out hades.json]
+python -m steam_buddy preset import 1145360 hades.json [--force]    # '-'면 표준입력
+```
+
+- **데이터 위치**: 내 데이터는 `~/.steam-buddy/compat.json`(`STEAM_BUDDY_HOME`으로 변경)에 저장되고, 패키지에 들어 있는 `steam_buddy/data/compat.json`보다 **우선**합니다(같은 appid는 항목별로 내 값이 덮어씀). 기존 `data.json`은 건드리지 않습니다.
+- **번들 파일은 예시일 뿐**입니다. 가상의 appid와 "확인 필요" 값뿐이며 실제 호환 정보가 아닙니다. 예시는 `(예시 데이터)`, 표에서는 `*`로 표시됩니다. 실제 등급은 Steam 상점 페이지/ProtonDB 등에서 직접 확인해 `compat set`으로 적으세요.
+- **값**: `--deck` = `verified`(인증됨) / `playable`(플레이 가능) / `unsupported`(미지원) / `unknown`(확인 필요). `--ac-linux`, `--ac-deck` = `yes` / `no` / `unknown`.
+- **프리셋 항목**: TDP(`tdp_w`, 3~30), FPS 제한(`fps_cap`, 15~240), 해상도(`resolution`, `1280x800` 형식), FSR(`off`/`quality`/`balanced`/`performance`/`ultra-performance`), 그래픽 메모(`graphics_notes`, 500자 이하). 모두 선택입니다.
+- **프리셋 공유 JSON** (`preset export`):
+
+```
+{"steam_buddy_preset": 1, "appid": 1145360, "name": "Hades",
+ "preset": {"tdp_w": 10, "fps_cap": 40, "resolution": "1280x800", "fsr": "quality", "graphics_notes": "그림자 중간"}}
+```
+
+  `preset import`는 스키마를 검사해서 모르는 항목, 범위를 벗어난 값, 틀린 형식이면 아무것도 저장하지 않고 오류를 냅니다. 파일 안의 appid가 지정한 appid와 다르면 `--force`가 필요합니다. 남이 준 파일은 값 확인 후 가져오세요.
 
 ## Steam Web API 키와 SteamID64 (선택, `sync`용)
 

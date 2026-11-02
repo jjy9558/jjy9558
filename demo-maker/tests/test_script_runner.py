@@ -81,7 +81,7 @@ class SandboxTests(unittest.TestCase):
         code = "import os;print(os.environ['X_DIR'])"
         rec = record(make_script([{"type": "cmd", "run": 'python -c "%s"' % code}], env={"X_DIR": "{{home}}/data"}))
         out = "".join(c[1] for c in rec.steps[0]["output"]).strip()
-        self.assertTrue(out.endswith(os.sep + "data") and "demomaker-" in out)
+        self.assertTrue(out.replace("\\", "/").endswith("/data") and "demomaker-" in out)
 
     def test_setup_writes_json_with_relative_dates(self):
         code = "import json,os;print(json.load(open(os.path.join(os.environ['HOME'],'a','b.json'),encoding='utf-8')))"

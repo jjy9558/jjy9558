@@ -127,6 +127,7 @@ class ParseTests(unittest.TestCase):
 class CachingTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)  # registered first => runs after store.close cleanups
         d = self.tmp.name
         self.sd = os.path.join(d, "570", "screenshots")
         make_png(os.path.join(self.sd, "20261101200000_1.png"), color=(1, 2, 3))
@@ -136,11 +137,9 @@ class CachingTests(unittest.TestCase):
                         db_path=os.path.join(d, "db.sqlite3"), out_dir=os.path.join(d, "out"),
                         names_cache="", use_steam_buddy=False, _path=os.path.join(d, "c.json"))
 
-    def tearDown(self):
-        self.tmp.cleanup()
-
     def test_hash_cache_and_rerun(self):
         store = Store(self.cfg["db_path"])
+        self.addCleanup(store.close)
         shots = list(scan_sources(self.cfg, {}))
         st = store.upsert_shots(shots, 10 ** 6)
         self.assertEqual(st["new"], 3)
@@ -153,7 +152,9 @@ class CachingTests(unittest.TestCase):
         self.assertEqual(len(fake.calls), 2)
         cli.cmd_caption(args, self.cfg, client=fake)  # 재실행: 호출 없음
         self.assertEqual(len(fake.calls), 2)
-        allc = Store(self.cfg["db_path"]).all_shots()
+        s2 = Store(self.cfg["db_path"])
+        self.addCleanup(s2.close)
+        allc = s2.all_shots()
         self.assertEqual(len(allc), 3)
         self.assertTrue(all(s["caption"] == "보스 앞에서 한 컷" for s in allc))
 
@@ -167,6 +168,7 @@ class CachingTests(unittest.TestCase):
 
     def test_limit_and_oversize_skip(self):
         store = Store(self.cfg["db_path"])
+        self.addCleanup(store.close)
         st = store.upsert_shots(list(scan_sources(self.cfg, {})), 10)  # 10바이트 초과 전부 건너뜀
         self.assertEqual(st["skipped"], 3)
         self.assertEqual(store.pending(), [])

@@ -73,6 +73,7 @@ class MemoryReuseOnUpdateTests(unittest.TestCase):
             self.assertEqual(rep.translated, 2)
             self.assertEqual(len(llm2.calls), 1)
             self.assertEqual(tm.count(), n + 2)
+            tm.close()
 
     def test_tm_keyed_by_source_hash_and_persists(self):
         with tempfile.TemporaryDirectory() as td:

@@ -175,7 +175,7 @@ class OtherVariants(unittest.TestCase):
             self.assertEqual(summarize(res), CANONICAL, enc)
 
     def test_crlf(self):
-        text = read_fixture("pc.txt").decode("utf-8").replace("\n", "\r\n")
+        text = read_fixture("pc.txt").decode("utf-8").replace("\r\n", "\n").replace("\n", "\r\n")
         res = parser.parse_export(parser.decode_bytes(text.encode("utf-8")))
         self.assertEqual(summarize(res), CANONICAL)
 

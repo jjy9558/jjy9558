@@ -115,7 +115,8 @@ class ApiTests(unittest.TestCase):
         self.assertTrue(created)
         t2, created2 = load_or_create_token(p)
         self.assertEqual((t, False), (t2, created2))
-        self.assertEqual(os.stat(p).st_mode & 0o077, 0)
+        if os.name == "posix":  # Windows has no POSIX permission bits
+            self.assertEqual(os.stat(p).st_mode & 0o077, 0)
 
 
 class FakeClient(object):

@@ -254,9 +254,11 @@ class TurnTests(unittest.TestCase):
             w.add_fact("기억할 것")
             w.commit(); w.close()
             w2 = World(p)
-            self.addCleanup(w2.close)
-            self.assertEqual(w2.location, "버드나무 주막")
-            self.assertEqual(w2.facts()[-1]["text"], "기억할 것")
+            try:
+                self.assertEqual(w2.location, "버드나무 주막")
+                self.assertEqual(w2.facts()[-1]["text"], "기억할 것")
+            finally:
+                w2.close()
 
     def test_wizard(self):
         import tempfile

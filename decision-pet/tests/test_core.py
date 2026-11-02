@@ -1,6 +1,7 @@
 import json
 import os
 import random
+from pathlib import Path
 import tempfile
 import unittest
 from datetime import datetime, timedelta
@@ -388,7 +389,7 @@ class StorageTests(PetCase):
         self.assertEqual(pet2.add("b")["id"], 2)
 
     def test_home_dir_env_override(self):
-        self.assertEqual(str(home_dir({"DECISION_PET_HOME": "/x/y", "APPDATA": "/a"})), "/x/y")
+        self.assertEqual(home_dir({"DECISION_PET_HOME": "/x/y", "APPDATA": "/a"}), Path("/x/y"))
         self.assertEqual(home_dir({"APPDATA": "/a"}), home_dir({"APPDATA": "/a"}))
         self.assertTrue(str(home_dir({"APPDATA": "/a"})).replace("\\", "/").endswith("a/decision-pet"))
         self.assertTrue(str(home_dir({})).endswith(".decision-pet"))

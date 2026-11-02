@@ -207,7 +207,8 @@ class TestLedger(TmpCase):
         p = r.stored_path
         self.assertIn(os.path.join("docs", "2026", "11"), p)
         self.assertEqual(read_text(p), S.SMS_SAMSUNG)
-        self.assertEqual(os.stat(p).st_mode & 0o077, 0)
+        if os.name == "posix":  # Windows has no POSIX permission bits
+            self.assertEqual(os.stat(p).st_mode & 0o077, 0)
 
     def test_db_text_is_masked_but_customer_no_kept(self):
         b = self.butler()

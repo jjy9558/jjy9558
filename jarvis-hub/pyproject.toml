@@ -1,0 +1,6 @@
+[project]
+name = "jarvis-hub"
+version = "0.1.0"
+description = "S21 + mini PC + RTX 5080 PC: Jarvis hub with a distributed job queue (stdlib only)"
+requires-python = ">=3.9"
+dependencies = []

@@ -1,0 +1,11 @@
+{
+  "hub": "http://127.0.0.1:8800",
+  "device": "minipc",
+  "token": "CHANGE-ME-minipc-token-xxxxxxxx",
+  "caps": ["lan", "speaker"],
+  "handlers": {
+    "wake": {"enabled": true, "repeat": 3},
+    "notify.say": {"enabled": true, "sidekick_url": "http://127.0.0.1:8765", "token": "SIDEKICK-TOKEN",
+                   "path": "/api/say"}
+  }
+}

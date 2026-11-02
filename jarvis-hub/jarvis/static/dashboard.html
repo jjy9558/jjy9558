@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>자비스 허브</title>
+<style>
+:root {
+  --bg: #f6f7f9; --card: #ffffff; --fg: #1b1f24; --muted: #667085; --line: #e4e7ec;
+  --accent: #2563eb; --ok: #16a34a; --off: #9ca3af; --warn: #d97706; --bad: #dc2626;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1115; --card: #181b21; --fg: #e6e8eb; --muted: #98a2b3; --line: #2a2f37;
+    --accent: #60a5fa; --ok: #4ade80; --off: #6b7280; --warn: #fbbf24; --bad: #f87171;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1115; --card: #181b21; --fg: #e6e8eb; --muted: #98a2b3; --line: #2a2f37;
+  --accent: #60a5fa; --ok: #4ade80; --off: #6b7280; --warn: #fbbf24; --bad: #f87171;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", "Noto Sans KR", sans-serif; }
+main { max-width: 760px; margin: 0 auto; padding: 16px; }
+h1 { font-size: 20px; margin: 4px 0 12px; display: flex; align-items: center; gap: 8px; }
+h2 { font-size: 13px; color: var(--muted); font-weight: 600; margin: 0 0 8px; letter-spacing: .02em; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
+.row { display: flex; gap: 8px; align-items: center; }
+input[type=text] { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--fg); font-size: 16px; }
+button { padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card);
+  color: var(--fg); font-size: 14px; cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.answer { margin-top: 10px; white-space: pre-wrap; min-height: 1.5em; }
+.dev { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.dev:last-child { border-bottom: 0; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; background: var(--off); }
+.dot.on { background: var(--ok); }
+.muted { color: var(--muted); font-size: 13px; }
+.counts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center; }
+.counts b { display: block; font-size: 22px; }
+.job { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.job:last-child { border-bottom: 0; }
+.job .head { display: flex; justify-content: space-between; gap: 8px; }
+.st { font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+.st.done { color: var(--ok); } .st.failed { color: var(--bad); } .st.leased { color: var(--accent); }
+.st.waiting_approval { color: var(--warn); }
+.res { font-size: 13px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+.ev { font-size: 13px; padding: 3px 0; overflow-wrap: anywhere; }
+#setup { display: none; }
+label.tog { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+</style>
+</head>
+<body>
+<main>
+  <h1>자비스 허브 <span id="conn" class="dot"></span></h1>
+
+  <section class="card" id="setup">
+    <h2>연결 설정</h2>
+    <p class="muted">처음 한 번: 이 주소 뒤에 <code>#device=s21&amp;token=…</code> 를 붙여 열면 이 브라우저에 저장됩니다.</p>
+    <div class="row"><input type="text" id="sdev" placeholder="기기 id (예: s21)"></div>
+    <div class="row" style="margin-top:8px"><input type="text" id="stok" placeholder="토큰"><button id="ssave" class="primary">저장</button></div>
+  </section>
+
+  <section class="card">
+    <h2>자비스에게 말하기</h2>
+    <div class="row">
+      <input type="text" id="cmd" placeholder="예: 오늘 일정이랑 작업 상태 알려줘" enterkeyhint="send">
+      <button id="mic" title="음성 입력">🎤</button>
+      <button id="send" class="primary">보내기</button>
+    </div>
+    <div class="row" style="margin-top:8px; justify-content: space-between">
+      <label class="tog"><input type="checkbox" id="speak"> 대답·완료 알림 소리로 읽기</label>
+      <span class="muted" id="micst"></span>
+    </div>
+    <div class="answer" id="answer"></div>
+  </section>
+
+  <section class="card">
+    <h2>작업 큐</h2>
+    <div class="counts">
+      <div><b id="c-leased">-</b><span class="muted">진행 중</span></div>
+      <div><b id="c-queued">-</b><span class="muted">대기</span></div>
+      <div><b id="c-waiting">-</b><span class="muted">승인 대기</span></div>
+      <div><b id="c-failed">-</b><span class="muted">실패</span></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>기기</h2>
+    <div id="devices" class="muted">불러오는 중…</div>
+  </section>
+
+  <section class="card">
+    <h2>최근 작업</h2>
+    <div id="jobs" class="muted">-</div>
+  </section>
+
+  <section class="card">
+    <h2>이벤트</h2>
+    <div id="events" class="muted">-</div>
+  </section>
+</main>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+  var cred = { device: store("jarvis.device") || "", token: store("jarvis.token") || "" };
+  if (location.hash.length > 1) {
+    var h = new URLSearchParams(location.hash.slice(1));
+    if (h.get("token")) { cred.device = h.get("device") || cred.device; cred.token = h.get("token");
+      store("jarvis.device", cred.device); store("jarvis.token", cred.token); }
+    history.replaceState(null, "", location.pathname);
+  }
+  $("speak").checked = store("jarvis.speak") === "1";
+  $("speak").onchange = function () { store("jarvis.speak", $("speak").checked ? "1" : "0"); if ($("speak").checked) say("읽기를 켰어요."); };
+  $("ssave").onclick = function () { cred.device = $("sdev").value.trim(); cred.token = $("stok").value.trim();
+    store("jarvis.device", cred.device); store("jarvis.token", cred.token); $("setup").style.display = "none"; refresh(); };
+  if (!cred.token) $("setup").style.display = "block";
+
+  function api(path, body) {
+    var opt = { method: body ? "POST" : "GET", headers: { "X-Jarvis-Device": cred.device, "X-Jarvis-Token": cred.token } };
+    if (body) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
+    return fetch(path, opt).then(function (r) {
+      return r.json().then(function (j) { if (!r.ok) { if (r.status === 401) $("setup").style.display = "block"; throw new Error(j.error || r.status); } return j; });
+    });
+  }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function ago(ts, now) { if (!ts) return "기록 없음"; var s = Math.max(0, Math.round(now - ts));
+    return s < 60 ? s + "초 전" : s < 3600 ? Math.round(s / 60) + "분 전" : Math.round(s / 3600) + "시간 전"; }
+  var STATUS = { queued: "대기", leased: "진행 중", done: "완료", failed: "실패", cancelled: "취소", waiting_approval: "승인 대기" };
+
+  function say(text) {
+    if (!$("speak").checked || !window.speechSynthesis || !text) return;
+    var u = new SpeechSynthesisUtterance(text); u.lang = "ko-KR"; speechSynthesis.speak(u);
+  }
+
+  function render(s) {
+    $("conn").className = "dot on";
+    $("c-leased").textContent = s.counts.leased; $("c-queued").textContent = s.counts.queued;
+    $("c-waiting").textContent = s.counts.waiting_approval; $("c-failed").textContent = s.counts.failed;
+    var dv = $("devices"); dv.textContent = ""; dv.className = "";
+    s.devices.forEach(function (d) {
+      var row = el("div", "dev"), left = el("div");
+      left.appendChild(el("span", "dot" + (d.online ? " on" : "")));
+      left.appendChild(el("span", null, d.label));
+      row.appendChild(left);
+      row.appendChild(el("span", "muted", (d.online ? "온라인" : "오프라인") + " · " + ago(d.last_seen, s.now) + (d.caps.length ? " · " + d.caps.join(",") : "")));
+      dv.appendChild(row);
+    });
+    var jb = $("jobs"); jb.textContent = ""; jb.className = "";
+    if (!s.jobs.length) jb.appendChild(el("div", "muted", "아직 작업이 없어요."));
+    s.jobs.forEach(function (j) {
+      var box = el("div", "job"), head = el("div", "head");
+      head.appendChild(el("span", null, "#" + j.id + " " + (j.title || j.type)));
+      head.appendChild(el("span", "st " + j.status, STATUS[j.status] || j.status));
+      box.appendChild(head);
+      var detail = j.type + " · " + j.created_by + (j.attempts ? " · 시도 " + j.attempts + "/" + j.max_attempts : "");
+      box.appendChild(el("div", "res", detail));
+      var r = j.result && (j.result.summary || j.result.text || j.result.stdout);
+      if (r) box.appendChild(el("div", "res", r));
+      if (j.error && j.status !== "done") box.appendChild(el("div", "res", "오류: " + j.error));
+      if (j.status === "waiting_approval") {
+        var bar = el("div", "row"); bar.style.marginTop = "6px";
+        var ok = el("button", "primary", "승인"), no = el("button", null, "거절");
+        ok.onclick = function () { api("/api/jobs/" + j.id + "/approve", {}).then(refresh, alertErr); };
+        no.onclick = function () { api("/api/jobs/" + j.id + "/reject", {}).then(refresh, alertErr); };
+        bar.appendChild(ok); bar.appendChild(no); box.appendChild(bar);
+      }
+      jb.appendChild(box);
+    });
+    var ev = $("events"); ev.textContent = ""; ev.className = "";
+    s.events.forEach(function (e) { ev.appendChild(el("div", "ev", "[" + e.kind + "] " + e.text)); });
+  }
+  function alertErr(e) { $("answer").textContent = "오류: " + e.message; }
+  function refresh() { if (!cred.token) return; api("/api/status").then(render, function () { $("conn").className = "dot"; }); }
+
+  function send(text) {
+    text = (text || "").trim(); if (!text) return;
+    $("answer").textContent = "…";
+    api("/api/say", { text: text, direct: true }).then(function (r) {
+      $("answer").textContent = r.answer || "(대답 없음)"; say(r.answer); refresh();
+    }, alertErr);
+    $("cmd").value = "";
+  }
+  $("send").onclick = function () { send($("cmd").value); };
+  $("cmd").onkeydown = function (e) { if (e.key === "Enter") send($("cmd").value); };
+
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { $("mic").disabled = true; $("micst").textContent = "음성 인식 미지원 (HTTPS 필요)"; }
+  $("mic").onclick = function () {
+    if (!SR) return;
+    var rec = new SR(); rec.lang = "ko-KR"; rec.interimResults = false;
+    $("micst").textContent = "듣는 중…";
+    rec.onresult = function (e) { var t = e.results[0][0].transcript; $("cmd").value = t; send(t); };
+    rec.onend = function () { $("micst").textContent = ""; };
+    rec.onerror = function (e) { $("micst").textContent = "음성 오류: " + e.error; };
+    rec.start();
+  };
+
+  // 이벤트 롱폴링: kind=say 면 읽어준다 (완료 알림 포함)
+  var last = -1;
+  function poll() {
+    if (!cred.token) { setTimeout(poll, 3000); return; }
+    var first = last < 0;
+    api("/api/events?since=" + Math.max(last, 0) + "&wait=" + (first ? 0 : 25)).then(function (r) {
+      if (first) { last = r.last_id; }
+      else {
+        var changed = false;
+        r.events.forEach(function (e) { last = Math.max(last, e.id); changed = true;
+          if (e.kind === "say" && !(e.data && e.data.source === "router" && e.data.to === cred.device)) say(e.text); });
+        if (changed) refresh();
+      }
+      setTimeout(poll, 100);
+    }, function () { setTimeout(poll, 5000); });
+  }
+  refresh(); setInterval(refresh, 10000); poll();
+})();
+</script>
+</body>
+</html>

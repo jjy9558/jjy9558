@@ -1,0 +1,20 @@
+{
+  "poll_seconds": 30,
+  "games": ["VALORANT-Win64-Shipping.exe", "eldenring.exe"],
+  "work_apps": ["Code.exe", "WindowsTerminal.exe", "claude.exe"],
+  "mombot": {
+    "start": "02:00",
+    "end": "06:00",
+    "interval_minutes": 10,
+    "allow_sleep": false,
+    "sleep_method": "suspend"
+  },
+  "outputs": {
+    "console": {"enabled": true},
+    "toast": {"enabled": true, "min_level": "warn", "method": "auto"},
+    "ntfy": {"enabled": false, "url": "https://ntfy.sh", "topic": "내-비밀-토픽-이름"},
+    "sidekick": {"enabled": false, "base_url": "http://127.0.0.1:8765", "token": "(또는 환경변수 SIDEKICK_TOKEN)"}
+  },
+  "events": {"enabled": false, "host": "127.0.0.1", "port": 8799, "token": "길고-무작위한-값"},
+  "llm": {"base_url": "http://127.0.0.1:8080/v1", "model": "local"}
+}

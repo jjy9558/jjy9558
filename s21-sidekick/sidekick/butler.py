@@ -9,6 +9,7 @@ import os
 import urllib.parse
 import urllib.request
 
+from . import door_providers
 from .triggers import Cooldown
 
 
@@ -219,6 +220,7 @@ PROVIDERS = {"greeting": greeting, "calendar_ics": calendar_ics,
              "claude_status": claude_status, "weather": weather, "delivery": delivery,
              "calendar_next": calendar_next, "reminders": reminders,
              "open_meteo": open_meteo, "gpu_busy": gpu_busy}
+PROVIDERS.update(door_providers.PROVIDERS)  # 선택 기능(기본 꺼짐): objmem_items 등
 
 
 def assemble(provider_cfgs, now, registry=None):

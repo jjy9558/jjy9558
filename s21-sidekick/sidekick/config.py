@@ -37,6 +37,15 @@ DEFAULTS = {
         "emergency_code": "",
         "fallback_camera_seconds": 45,
         "requirement": "칫솔을 들고 있는 얼굴, 또는 욕실 세면대 앞에 서 있는 모습",
+        # 선택(기본 꺼짐): 알람 승인 -> morning-brief의 brief-latest.json speak_text 낭독 (읽기 전용)
+        "morning_gate": {
+            "enabled": False,
+            "brief_path": "",
+            "stale_text": "오늘 브리핑이 아직 없어요.",
+            "speak_reject": False,
+            "reject_text": "브리핑은 일어나면 해 드립니다.",
+            "max_chars": 300,
+        },
     },
     "butler": {
         "enabled": True,
@@ -64,6 +73,11 @@ DEFAULTS = {
             {"name": "reminders", "items": ["지갑", "열쇠", "휴대폰 충전기"]},
             # nvidia-smi로 GPU 사용률 확인 (선택, 기본 꺼짐)
             {"name": "gpu_busy", "enabled": False, "threshold": 30},
+            # 아래 셋은 다른 프로젝트 데이터를 읽기만 하는 선택 기능 (기본 꺼짐, 실패하면 조용히 생략)
+            {"name": "objmem_items", "enabled": False, "url": "http://127.0.0.1:8788",
+             "token_env": "OBJMEM_TOKEN", "items": ["지갑", "이어폰", "열쇠"], "stale_hours": 24, "timeout": 3},
+            {"name": "soundwatch_door", "enabled": False, "db_path": "", "hours": 6},
+            {"name": "paperbutler_returns", "enabled": False, "db_path": "", "days": 2},
         ],
     },
     # 커밋 관중석: python -m sidekick notify <event>

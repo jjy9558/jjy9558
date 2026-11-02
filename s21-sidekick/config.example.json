@@ -44,7 +44,15 @@
     "max_ring_minutes": 60,
     "emergency_code": "482915",
     "fallback_camera_seconds": 45,
-    "requirement": "칫솔을 들고 있는 얼굴, 또는 욕실 세면대 앞에 서 있는 모습"
+    "requirement": "칫솔을 들고 있는 얼굴, 또는 욕실 세면대 앞에 서 있는 모습",
+    "morning_gate": {
+      "enabled": false,
+      "brief_path": "C:/dev/morning-brief/out/brief-latest.json",
+      "stale_text": "오늘 브리핑이 아직 없어요.",
+      "speak_reject": false,
+      "reject_text": "브리핑은 일어나면 해 드립니다.",
+      "max_chars": 300
+    }
   },
   "butler": {
     "cooldown_seconds": 600,
@@ -105,6 +113,31 @@
         "name": "gpu_busy",
         "enabled": false,
         "threshold": 30
+      },
+      {
+        "name": "objmem_items",
+        "enabled": false,
+        "url": "http://127.0.0.1:8788",
+        "token_env": "OBJMEM_TOKEN",
+        "items": [
+          "지갑",
+          "이어폰",
+          "열쇠"
+        ],
+        "stale_hours": 24,
+        "timeout": 3
+      },
+      {
+        "name": "soundwatch_door",
+        "enabled": false,
+        "db_path": "C:/dev/sound-watch/soundwatch.db",
+        "hours": 6
+      },
+      {
+        "name": "paperbutler_returns",
+        "enabled": false,
+        "db_path": "C:/dev/paper-butler/paperbutler.db",
+        "days": 2
       }
     ]
   },

@@ -1,4 +1,5 @@
 """HTTP 서버: 폰 페이지 + JSON API. 뼈대 = 폰이 듣고/보고 -> PC가 판단 -> 폰이 말하거나 PC가 행동."""
+import datetime as dt
 import hmac
 import json
 import os
@@ -14,6 +15,7 @@ from .debugger import Debugger, default_runner
 from .departure import Departure
 from .events import EventQueue
 from .macro import MacroPad
+from .morning_gate import MorningGate
 from .llm import client_from_config
 from .relay import Forwarder, clean_module, clean_say_text, forward_types, validate_event
 from .stadium import RateLimiter, Stadium
@@ -38,7 +40,9 @@ class Sidekick:
         self.alarm = Alarm(cfg["alarm"], vision=vision, clock=clock)
         self.butler = Butler(cfg["butler"], clock=clock)
         self.departure = Departure(cfg["departure"], clock=clock, monotonic=monotonic,
-                                   registry=departure_registry, runner=runner)
+                                   registry=departure_registry, runner=runner,
+                                   max_chars=int(cfg["say"].get("max_chars", 300)))
+        self.morning = MorningGate(cfg["alarm"].get("morning_gate"), clock or dt.datetime.now)
         self.stadium = Stadium(cfg["stadium"], monotonic=monotonic, rng=rng)
         self.approvals = ApprovalBoard(cfg["approval"], self.events, clock=monotonic or time.monotonic)
         sc = cfg["say"]
@@ -54,6 +58,27 @@ class Sidekick:
         self.macros = MacroPad(cfg["macro"], clock=clock, monotonic=monotonic, internal={
             "departure": self._macro_departure, "arrival": self._macro_arrival,
             "stadium": self._macro_stadium}, **mk)
+
+    # ---- 알람 + 아침 브리핑 (승인되면 brief-latest.json 낭독, 반려면 절대 읽지 않음) ----
+    def alarm_check(self, image):
+        r = self.alarm.check_photo(image)
+        if r.get("verdict") == "approved":
+            r = self._with_brief(r)
+        elif r.get("verdict") == "rejected":
+            extra = self.morning.on_rejected()
+            if extra:
+                r = dict(r, say=r["say"] + " " + extra)
+        return r
+
+    def alarm_answer(self, value):
+        r = self.alarm.answer(value)
+        return self._with_brief(r) if r.get("ok") else r
+
+    def _with_brief(self, r):
+        text, status = self.morning.on_approved()
+        if not text:
+            return r
+        return dict(r, say=r["say"] + " " + text, brief=status)
 
     # ---- 매크로 패드가 재사용하는 내부 동작 (config에 적힌 것만 호출됨) ----
     def _macro_departure(self, item):
@@ -226,7 +251,7 @@ class Handler(BaseHTTPRequestHandler):
         img = str(self._json().get("image") or "")
         if not img.startswith("data:image/"):
             raise ValueError("image는 data:image/... 형식이어야 합니다")
-        return 200, self.app.alarm.check_photo(img)
+        return 200, self.app.alarm_check(img)
 
     def r_alarm_snooze(self, q):
         return 200, self.app.alarm.snooze()
@@ -235,7 +260,7 @@ class Handler(BaseHTTPRequestHandler):
         return 200, self.app.alarm.emergency_off(self._json().get("code", ""))
 
     def r_alarm_answer(self, q):
-        return 200, self.app.alarm.answer(self._json().get("answer", ""))
+        return 200, self.app.alarm_answer(self._json().get("answer", ""))
 
     def r_alarm_set(self, q):
         self.app.alarm.set_time(str(self._json().get("time") or ""))

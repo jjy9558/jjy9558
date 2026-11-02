@@ -12,9 +12,9 @@ S21이 듣고 보면  ──▶  PC가 판단  ──▶  S21이 말하거나 / 
 | 모듈 | 폰이 하는 일 | PC가 하는 일 |
 |---|---|---|
 | 혼잣말 디버거 | "아 이거 왜 안 돼"를 듣는다 → 요약을 읽어준다 | 최근 에러 로그를 보거나 `claude -p`를 돌린다 |
-| 침대 탈출 알람 | 시끄럽게 울린다 → 칫솔/세면대 사진을 찍는다 | 비전 모델로 판정: "반려. 아직 누워 있음." |
+| 침대 탈출 알람 | 시끄럽게 울린다 → 칫솔/세면대 사진을 찍는다 | 비전 모델로 판정: "반려. 아직 누워 있음." (승인되면 선택적으로 아침 브리핑 낭독) |
 | 귀가 집사 | 현관 움직임(또는 버튼)을 감지 → 요약을 읽어준다 | 일정·Claude 상태 등 provider 결과를 모은다 |
-| 현관 출발 체크 | "나 간다" 버튼/모션 → 체크리스트를 읽어준다 | 날씨·첫 일정·챙길 것·GPU 상태 provider를 모은다 |
+| 현관 출발 체크 | "나 간다" 버튼/모션 → 체크리스트를 읽어준다 | 날씨·첫 일정·챙길 것·GPU 상태 (선택: 물건 기억·문 앞 노크·반품 마감) provider를 모은다 |
 | 커밋 관중석 | 환호·야유·불꽃놀이 (Web Audio 합성) + 큰 이모지 | `git push`/CI/PR 머지 결과를 `notify`로 알린다 |
 | 매크로 패드 | 큰 버튼 격자(또는 NFC 태그)를 누른다 | config에 미리 적어 둔 프로그램 실행·URL 열기·키 입력·텍스트 입력만 한다 |
 | rm -rf 결재 보고 | "사장님, ... 해도 되겠습니까?" → 승인/반려 (버튼·음성) | Claude Code 훅이 위험 명령을 결재가 날 때까지 붙잡는다 |
@@ -46,8 +46,9 @@ python -m sidekick serve --config config.json
 | `alarm.emergency_code` | **필수.** 비상 해제 코드. 절대 갇히지 않기 위한 장치 |
 | `alarm.max_ring_minutes` | 이 시간이 지나면 알람은 스스로 멈춤 (기본 60분) |
 | `alarm.fallback_camera_seconds` | 수동 모드에서 카메라를 켜고 버텨야 하는 시간 |
+| `alarm.morning_gate` | (선택, 기본 꺼짐) 알람 승인 시 `morning-brief`의 `brief-latest.json` 낭독 — 침대 탈출 알람 절 참고 |
 | `butler.providers` | 귀가 요약에 들어갈 provider 목록 (아래 참고) |
-| `departure.providers` | 출발 체크리스트 provider 목록 (아래 참고) |
+| `departure.providers` | 출발 체크리스트 provider 목록 (날씨·일정·챙길 것·GPU, 선택: 물건 기억/문 앞 노크/반품 마감 — 아래 참고) |
 | `stadium.max_per_minute` / `min_interval_seconds` / `big_pr_lines` | 관중석 레이트 리밋, "큰 PR" 기준 줄 수 |
 | `approval.*` | 결재 보고 훅 설정 (시간 제한, 시간 초과/서버 없음 처리, 위험 패턴) — 아래 참고 |
 | `say.*` | 외부 프로그램용 `POST /api/say` (분당 횟수, 최대 글자 수) |
@@ -98,6 +99,23 @@ PC에서 듣고 싶다면 `pip install faster-whisper` 후 "PC 음성 인식"을
   - 시각을 이미 지난 시간으로 바꾸거나 서버를 늦게 켜도 바로 울리지 않음
   - 결국 웹페이지이므로 탭을 닫으면 꺼집니다. 이건 의지력 보조 도구지 감옥이 아닙니다.
 
+#### 아침 브리핑 연동 (`alarm.morning_gate`, 선택, 기본 꺼짐)
+알람이 **승인되면**(사진 판정 통과, 또는 수동 모드에서 산수 정답) 같은 응답의 `say` 뒤에 `morning-brief`가 만들어 둔 `out/brief-latest.json`의 `speak_text`를 이어 붙여 폰이 읽어 줍니다: "승인. 좋은 아침이에요! 오늘 할 일은 …". 일어나야만 들을 수 있는 브리핑입니다.
+
+```json
+"alarm": { "morning_gate": {
+  "enabled": true,
+  "brief_path": "C:/dev/morning-brief/out/brief-latest.json",
+  "stale_text": "오늘 브리핑이 아직 없어요.",
+  "speak_reject": false, "reject_text": "브리핑은 일어나면 해 드립니다.", "max_chars": 300 } }
+```
+
+- **파일 계약**은 `morning-brief/mbrief/contract.py`에 있습니다. 여기서 쓰는 키는 `date` / `speak_text` / `reject_text` 뿐이고 모르는 키는 무시합니다. sidekick은 그 파일을 **읽기만** 합니다(쓰기·삭제·이름 변경 없음).
+- `date`가 **오늘이 아니면 오래된 파일**로 보고 `speak_text`를 읽지 않고 `stale_text` 한 줄만 말합니다. 파일이 없거나, JSON이 깨졌거나, `speak_text`가 비어도 같습니다(알람 승인 자체는 영향 없음).
+- **반려**되면 `speak_text`는 절대 읽지 않습니다. `speak_reject: true`일 때만 파일의 `reject_text`(없으면 설정의 `reject_text`) 한 줄을 반려 멘트 뒤에 덧붙입니다.
+- 비상 코드로 끈 경우에는 브리핑을 읽지 않습니다. 총 길이는 `morning_gate.max_chars`(기본 300)로 자릅니다.
+- 승인 응답에는 `brief` 필드(`ok`/`stale`/`missing`/`invalid`)가 함께 옵니다.
+
 ### 귀가 집사
 - 집사 탭에서 **현관 모션 감지 켜기**: 후면 카메라 프레임을 32px로 줄여 이전 프레임과 비교, 변화가 `min_changed_ratio`를 넘으면 `/api/arrival`. (모션은 `butler.cooldown_seconds` 쿨다운, **나 왔어** 버튼은 항상 동작)
 - PC는 provider들의 결과를 이어 붙여 폰에 말하게 합니다.
@@ -121,6 +139,24 @@ PC에서 듣고 싶다면 `pip install faster-whisper` 후 "PC 음성 인식"을
 | `calendar_next` | 같은 .ics 파서로 **오늘 아직 시작 안 한 첫 일정** + 종일 일정 (`grace_minutes`분 전까지는 아직 '다가오는' 것으로 봄) |
 | `reminders` | 고정 항목: `["지갑", "우산", "에어컨 껐는지"]`. 요일 한정은 `{"text": "분리수거", "weekdays": [0, 3]}` (0=월) |
 | `gpu_busy` | (선택, 기본 꺼짐) `nvidia-smi --query-gpu=name,utilization.gpu ...`를 **인자 리스트**로 실행해 사용률이 `threshold`% 이상이면 "PC가 아직 일하는 중이에요". `nvidia_smi`로 실행 파일 경로 지정 가능. 없으면 생략 |
+
+#### 물건 기억·문 앞·반품 provider (선택, 전부 기본 꺼짐)
+다른 프로젝트의 데이터를 **읽기만** 하는 provider 세 개입니다. 각각 `enabled: true`로 켜야 하고, 실패(서버 꺼짐·파일 없음·토큰 오류 등)하면 **로그 한 줄만 남기고 조용히 건너뛰어** 나머지 항목은 그대로 읽습니다. 모든 요청에는 타임아웃이 있고 로그에는 토큰·물건/가게 이름을 남기지 않습니다.
+
+| provider | 내용 |
+|---|---|
+| `objmem_items` | `object-memory`(기본 `http://127.0.0.1:8788`)의 `GET /api/ask`에 `items`(예: 지갑·이어폰·열쇠)마다 "지갑 어디 있어"를 물어 **마지막 목격 시각·위치**만 말합니다: "물건 기억 - 지갑: 오늘 21:40 책상 위에서 봤어요." 토큰은 `token_env`(기본 `OBJMEM_TOKEN`) 환경변수 또는 `token`, 헤더 `X-ObjMem-Token`. 기록이 `stale_hours`(기본 24)보다 오래됐거나 없거나 일치도가 낮으면 위치를 말하지 않고 **"모름"**이라고 합니다(거짓 안심 방지). 서버에 못 붙으면 "모름"이라고 하지 않고 통째로 생략합니다. `timeout` 기본 3초 |
+| `soundwatch_door` | `sound-watch`의 sqlite(`db_path`, 보통 `<데이터 폴더>/soundwatch.db`)를 `mode=ro`로 열어 최근 `hours`(기본 6)시간의 `detections`에서 `kind`가 `kinds`(기본 `["knock"]`)이거나 `name`에 `names`(기본 `초인종`, `doorbell`)가 들어간 감지를 셉니다: "최근 6시간 안에 노크·초인종 소리가 2번 있었어요 (마지막 14:05). 문 앞 택배 있을 수도 있어요." 없으면 아무 말 안 함. ("집 비운 동안"이 아니라 최근 N시간 기준입니다) |
+| `paperbutler_returns` | `paper-butler`의 sqlite(`db_path`, 보통 `<홈>/paperbutler.db`)를 `mode=ro`로 열어 `refunds`에서 처리 안 한(`done=0`) 마감이 오늘부터 `days`(기본 2)일 이내인 것을 말합니다: "반품 마감: 쿠팡 오늘, 무신사 내일." 금액은 말하지 않고 `max_items`(기본 3)개까지, 나머지는 "외 N건" |
+
+```json
+{"name": "objmem_items", "enabled": true, "items": ["지갑", "이어폰", "열쇠"], "token_env": "OBJMEM_TOKEN"},
+{"name": "soundwatch_door", "enabled": true, "db_path": "C:/dev/sound-watch/data/soundwatch.db", "hours": 6},
+{"name": "paperbutler_returns", "enabled": true, "db_path": "C:/Users/me/.paperbutler/paperbutler.db", "days": 2}
+```
+
+- **글자 수 한도**: 출발 체크 전체 문장이 `say.max_chars`(기본 300)를 넘으면 **`departure.providers`에서 뒤에 적은 항목부터 통째로 뺍니다**(문장 중간을 자르지 않음; `intro`/`outro`는 유지). 그래서 중요한 provider를 앞에 쓰세요. 응답에는 뺀 개수 `dropped`가 들어갑니다.
+- 같은 provider를 귀가 집사(`butler.providers`)에 꽂아도 됩니다(같은 구조).
 
 ### 커밋 관중석
 PC에서 이렇게 부르면 폰이 반응합니다 (토큰은 config에서 읽음):
@@ -292,7 +328,7 @@ Claude Code `settings.json` (사용자 `~/.claude/settings.json` 또는 프로�
 - 토큰은 상수 시간 비교, 요청 크기 제한(`server.max_body_mb`), 기본 바인딩은 localhost.
 - 매크로 패드: 폰은 id만 보내고 PC는 config의 동작만 실행합니다 (`launch`는 `shell=False` 인자 목록, `url`은 허용 스킴만). NFC 키는 매크로별 전용·취소 가능하며 다른 API엔 통하지 않습니다.
 - 결재 보고: 폰은 승인/반려만 표시할 수 있고 아무것도 실행하지 않습니다. `notify`·훅은 **현재 폴더의 config.json을 읽지 않습니다** (훅은 남의 저장소 안에서 돌기 때문에, 그 저장소가 심어 둔 설정이 위험 패턴이나 `fail_open`을 바꾸지 못하게).
-- 바깥으로 나가는 요청은 직접 켠 것뿐: `vision`/`llm`, `open_meteo`(기본 꺼짐), `forward_events`(기본 비어 있음).
+- 바깥으로 나가는 요청은 직접 켠 것뿐: `vision`/`llm`, `open_meteo`(기본 꺼짐), `forward_events`(기본 비어 있음), `objmem_items`(기본 꺼짐, 보통 localhost). `morning_gate`·`soundwatch_door`·`paperbutler_returns`는 다른 프로젝트의 파일을 **읽기 전용**으로만 엽니다(기본 꺼짐).
 - `config.json`에는 토큰과 비상 코드가 있으니 커밋하지 마세요 (`.gitignore`에 포함).
 
 ## 6. 테스트
@@ -301,7 +337,7 @@ Claude Code `settings.json` (사용자 `~/.claude/settings.json` 또는 프로�
 python3 -m unittest discover -s tests -v
 ```
 
-외부 네트워크 없이 돌아갑니다 (날씨는 가짜 fetch, nvidia-smi는 가짜 runner, 서버는 포트 0). Node + Playwright(Chromium)가 있으면 `test_page_smoke`가 실제 브라우저로 폰 페이지를 띄워 JS 오류 없이 디버거·알람(가짜 카메라)·집사·출발·관중석·매크로 패드(탭 버튼, 확인 창, NFC 해시 진입 — 가짜 launcher) 흐름이 도는지 보고, 마지막에 **진짜 훅**으로 `rm -rf ./build` 결재를 올려 폰 화면에서 승인 버튼을 눌러 훅이 `allow` JSON을 내는지까지 확인합니다. 없으면 건너뜁니다.
+외부 네트워크 없이 돌아갑니다 (날씨는 가짜 fetch, nvidia-smi는 가짜 runner, object-memory는 포트 0의 가짜 서버, sound-watch·paper-butler sqlite는 원본 스키마 텍스트로 만든 임시 DB, 서버는 포트 0). Node + Playwright(Chromium)가 있으면 `test_page_smoke`가 실제 브라우저로 폰 페이지를 띄워 JS 오류 없이 디버거·알람(가짜 카메라)·집사·출발·관중석·매크로 패드(탭 버튼, 확인 창, NFC 해시 진입 — 가짜 launcher) 흐름이 도는지 보고, 마지막에 **진짜 훅**으로 `rm -rf ./build` 결재를 올려 폰 화면에서 승인 버튼을 눌러 훅이 `allow` JSON을 내는지까지 확인합니다. 없으면 건너뜁니다.
 
 ## 7. 로드맵 (다음 모듈 후보)
 

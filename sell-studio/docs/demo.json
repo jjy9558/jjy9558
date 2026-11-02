@@ -1,0 +1,18 @@
+{
+  "title": "sell-studio",
+  "project": "..",
+  "width": 96,
+  "height": 24,
+  "steps": [
+    {"type": "setup", "files": {"work/paste.txt": "RTX 3060 12GB 28만원\nRTX 3060 25만 5천\n270,000원\n290000\n262,000원\n",
+                                "work/draft.txt": "RTX 3060 최저가!!! 연락 010-1234-5678\n"}},
+    {"type": "comment", "text": "# 판매글 린트: 금칙어와 전화번호를 잡는다"},
+    {"type": "cmd", "run": "python -m sellstudio lint {{work}}/draft.txt", "show": "sell-studio lint draft.txt", "allow_fail": true},
+    {"type": "pause", "seconds": 1.5},
+    {"type": "comment", "text": "# 되팔이 장부: 매입 -> 판매 -> 순이익"},
+    {"type": "cmd", "run": "python -m sellstudio ledger add --ledger {{work}}/l.json --name \"RTX 3060\" --buy 15만 --repair 1만 --date 2026-10-01", "show": "sell-studio ledger add --name \"RTX 3060\" --buy 15만 --repair 1만"},
+    {"type": "cmd", "run": "python -m sellstudio ledger sold --ledger {{work}}/l.json \"RTX 3060\" --price 22만 --market bunjang --date 2026-10-11", "show": "sell-studio ledger sold \"RTX 3060\" --price 22만 --market bunjang"},
+    {"type": "cmd", "run": "python -m sellstudio ledger report --ledger {{work}}/l.json --today 2026-11-01", "show": "sell-studio ledger report", "max_lines": 14},
+    {"type": "pause", "seconds": 2}
+  ]
+}

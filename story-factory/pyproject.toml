@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "story-factory"
+version = "0.1.0"
+description = "사연 공장 야간조: 생활 로그 소재를 익명 사연 쇼츠 대본으로"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+story-factory = "storyfactory.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["storyfactory", "storyfactory.*"]

@@ -1,0 +1,52 @@
+{
+ "meta": {
+  "year": 2026,
+  "title": null,
+  "anonymized": true,
+  "top": 5
+ },
+ "empty": false,
+ "totals": {
+  "messages": 1500,
+  "members": 4,
+  "active_days": 120
+ },
+ "busiest_day": {
+  "date": "2026-03-14",
+  "count": 321,
+  "weekday": 5,
+  "top_count": 90
+ },
+ "hours": [
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  200,
+  100
+ ],
+ "peak_hour": 22,
+ "streak": {
+  "days": 12,
+  "start": "2026-02-01",
+  "end": "2026-02-12"
+ }
+}

@@ -1,0 +1,18 @@
+{
+  "title": "story-factory",
+  "project": "..",
+  "width": 96,
+  "height": 24,
+  "steps": [
+    {"type": "comment", "text": "# 가짜 샘플 로그에서 소재 카드 뽑기 (원본은 읽기만 함)"},
+    {"type": "cmd", "run": "python -m storyfactory seeds --life-nagger docs/sample/counters.jsonl --decision-pet docs/sample/decision-pet.json --cool-off docs/sample/cool-off.json --kakao docs/sample/kakao-anon.json --date 2026-11-02 --max-cards 5",
+     "show": "story-factory seeds --life-nagger ... --max-cards 5"},
+    {"type": "pause", "seconds": 1.5},
+    {"type": "comment", "text": "# 실명/연락처 가명화 + 민감 주제 표시"},
+    {"type": "cmd", "run": "python -m storyfactory scrub \"김민수 씨한테 010-1234-5678 로 연락했다\" --name 김민수",
+     "show": "story-factory scrub \"김민수 씨한테 ...\" --name 김민수"},
+    {"type": "cmd", "run": "python -m storyfactory scrub \"어제 병원에서 우울증 진단을 받았다\"",
+     "show": "story-factory scrub \"어제 병원에서 ...\""},
+    {"type": "pause", "seconds": 1.5}
+  ]
+}

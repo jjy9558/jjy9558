@@ -1,0 +1,11 @@
+{
+  "title": "taste-map",
+  "project": "..",
+  "width": 84,
+  "height": 20,
+  "steps": [
+    {"type": "comment", "text": "# 취향 요약 (미리 가져온 데이터가 있다고 가정)"},
+    {"type": "cmd", "run": "python -m tastemap --help", "show": "taste-map --help"},
+    {"type": "pause", "seconds": 1.0}
+  ]
+}

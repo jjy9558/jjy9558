@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "taste-map"
+version = "0.1.0"
+description = "취향 지도: 스팀 구매, 게임 스크린샷 캡션, 유튜브 시청 기록을 태그 벡터로 바꿔 지도, 프로필, 후보 순위를 만든다"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+taste-map = "tastemap.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["tastemap", "tastemap.*"]
+
+[tool.setuptools.package-data]
+tastemap = ["data/*.json"]

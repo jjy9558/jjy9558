@@ -1,0 +1,1188 @@
+{
+ "_comment": "오프라인 태그 사전(예시). aliases 로 제목/장르/캡션 글자를 찾아 태그를 붙이고, games 는 이름이나 appid 로 아는 게임에 태그를 붙입니다. appid 는 확인되지 않은 예시일 수 있으니 이름 별칭을 우선 쓰세요. 사용자 파일 <데이터 폴더>/tags.json 이 같은 형식으로 덧붙고 덮어씁니다.",
+ "version": 1,
+ "tags": {
+  "action": {
+   "label": "액션",
+   "group": "genre",
+   "aliases": [
+    "action",
+    "액션",
+    "hack and slash",
+    "핵앤슬래시",
+    "hack-and-slash",
+    "beat em up"
+   ]
+  },
+  "adventure": {
+   "label": "어드벤처",
+   "group": "genre",
+   "aliases": [
+    "adventure",
+    "어드벤처",
+    "탐험",
+    "exploration"
+   ]
+  },
+  "rpg": {
+   "label": "RPG",
+   "group": "genre",
+   "aliases": [
+    "rpg",
+    "role-playing",
+    "role playing",
+    "롤플레잉",
+    "jrpg",
+    "crpg",
+    "arpg"
+   ]
+  },
+  "roguelike": {
+   "label": "로그라이크",
+   "group": "genre",
+   "aliases": [
+    "roguelike",
+    "roguelite",
+    "rogue-like",
+    "rogue-lite",
+    "로그라이크",
+    "로그라이트"
+   ]
+  },
+  "souls-like": {
+   "label": "소울라이크",
+   "group": "genre",
+   "aliases": [
+    "souls-like",
+    "soulslike",
+    "souls like",
+    "소울라이크",
+    "소울류",
+    "dark souls",
+    "다크 소울",
+    "boss rush",
+    "보스 러시"
+   ]
+  },
+  "metroidvania": {
+   "label": "메트로배니아",
+   "group": "genre",
+   "aliases": [
+    "metroidvania",
+    "메트로배니아",
+    "메트로베니아"
+   ]
+  },
+  "platformer": {
+   "label": "플랫포머",
+   "group": "genre",
+   "aliases": [
+    "platformer",
+    "platform",
+    "플랫포머",
+    "플랫폼"
+   ]
+  },
+  "puzzle": {
+   "label": "퍼즐",
+   "group": "genre",
+   "aliases": [
+    "puzzle",
+    "퍼즐",
+    "수수께끼",
+    "logic"
+   ]
+  },
+  "strategy": {
+   "label": "전략",
+   "group": "genre",
+   "aliases": [
+    "strategy",
+    "전략",
+    "rts",
+    "4x",
+    "grand strategy",
+    "turn-based strategy"
+   ]
+  },
+  "tactical": {
+   "label": "택티컬",
+   "group": "genre",
+   "aliases": [
+    "tactical",
+    "tactics",
+    "택티컬",
+    "턴제",
+    "turn-based",
+    "turn based"
+   ]
+  },
+  "simulation": {
+   "label": "시뮬레이션",
+   "group": "genre",
+   "aliases": [
+    "simulation",
+    "시뮬레이션",
+    "시뮬"
+   ]
+  },
+  "management": {
+   "label": "경영",
+   "group": "genre",
+   "aliases": [
+    "management",
+    "tycoon",
+    "경영",
+    "타이쿤",
+    "city builder",
+    "city-builder",
+    "도시 건설"
+   ]
+  },
+  "farming": {
+   "label": "농사/생활",
+   "group": "genre",
+   "aliases": [
+    "farming",
+    "farm",
+    "농장",
+    "농사",
+    "life sim",
+    "생활 시뮬"
+   ]
+  },
+  "survival": {
+   "label": "생존",
+   "group": "genre",
+   "aliases": [
+    "survival",
+    "생존",
+    "서바이벌",
+    "crafting"
+   ]
+  },
+  "sandbox": {
+   "label": "샌드박스",
+   "group": "genre",
+   "aliases": [
+    "sandbox",
+    "샌드박스",
+    "minecraft",
+    "마인크래프트",
+    "건축"
+   ]
+  },
+  "open-world": {
+   "label": "오픈월드",
+   "group": "genre",
+   "aliases": [
+    "open world",
+    "open-world",
+    "오픈월드",
+    "오픈 월드"
+   ]
+  },
+  "fps": {
+   "label": "FPS",
+   "group": "genre",
+   "aliases": [
+    "fps",
+    "first-person shooter",
+    "first person shooter",
+    "1인칭 슈팅",
+    "tactical shooter"
+   ]
+  },
+  "shooter": {
+   "label": "슈팅",
+   "group": "genre",
+   "aliases": [
+    "shooter",
+    "shoot em up",
+    "shmup",
+    "슈팅",
+    "탄막",
+    "bullet hell"
+   ]
+  },
+  "horror": {
+   "label": "공포",
+   "group": "genre",
+   "aliases": [
+    "horror",
+    "공포",
+    "호러",
+    "scary",
+    "무서운",
+    "creepy"
+   ]
+  },
+  "story": {
+   "label": "스토리",
+   "group": "genre",
+   "aliases": [
+    "story rich",
+    "story-rich",
+    "narrative",
+    "visual novel",
+    "스토리",
+    "서사",
+    "비주얼 노벨",
+    "cutscene",
+    "cinematic"
+   ]
+  },
+  "racing": {
+   "label": "레이싱",
+   "group": "genre",
+   "aliases": [
+    "racing",
+    "레이싱",
+    "driving",
+    "드라이빙"
+   ]
+  },
+  "sports": {
+   "label": "스포츠",
+   "group": "genre",
+   "aliases": [
+    "sports",
+    "스포츠",
+    "football",
+    "soccer",
+    "축구",
+    "basketball",
+    "농구",
+    "baseball",
+    "야구",
+    "golf",
+    "골프"
+   ]
+  },
+  "fighting": {
+   "label": "대전격투",
+   "group": "genre",
+   "aliases": [
+    "fighting",
+    "격투",
+    "대전 격투",
+    "street fighter",
+    "스트리트 파이터",
+    "tekken",
+    "철권"
+   ]
+  },
+  "rhythm": {
+   "label": "리듬",
+   "group": "genre",
+   "aliases": [
+    "rhythm",
+    "리듬",
+    "music game",
+    "음악 게임"
+   ]
+  },
+  "card": {
+   "label": "카드",
+   "group": "genre",
+   "aliases": [
+    "card game",
+    "card battler",
+    "카드 게임",
+    "카드게임",
+    "tcg",
+    "ccg",
+    "deckbuilder",
+    "deckbuilding",
+    "deck-building",
+    "덱빌딩",
+    "덱 빌딩"
+   ]
+  },
+  "mmo": {
+   "label": "MMO",
+   "group": "genre",
+   "aliases": [
+    "mmo",
+    "mmorpg",
+    "massively multiplayer",
+    "대규모 멀티",
+    "raid",
+    "레이드"
+   ]
+  },
+  "moba": {
+   "label": "MOBA",
+   "group": "genre",
+   "aliases": [
+    "moba",
+    "dota",
+    "league of legends",
+    "리그 오브 레전드"
+   ]
+  },
+  "multiplayer": {
+   "label": "멀티플레이",
+   "group": "mode",
+   "aliases": [
+    "multiplayer",
+    "multi-player",
+    "pvp",
+    "멀티플레이",
+    "멀티",
+    "온라인 대전"
+   ]
+  },
+  "coop": {
+   "label": "협동",
+   "group": "mode",
+   "aliases": [
+    "co-op",
+    "coop",
+    "cooperative",
+    "협동",
+    "친구와"
+   ]
+  },
+  "singleplayer": {
+   "label": "싱글플레이",
+   "group": "mode",
+   "aliases": [
+    "single-player",
+    "singleplayer",
+    "single player",
+    "싱글"
+   ]
+  },
+  "indie": {
+   "label": "인디",
+   "group": "style",
+   "aliases": [
+    "indie",
+    "인디"
+   ]
+  },
+  "pixel": {
+   "label": "픽셀 아트",
+   "group": "style",
+   "aliases": [
+    "pixel art",
+    "pixel",
+    "픽셀",
+    "도트",
+    "retro",
+    "레트로",
+    "16-bit",
+    "8-bit"
+   ]
+  },
+  "cozy": {
+   "label": "힐링/아늑",
+   "group": "mood",
+   "aliases": [
+    "cozy",
+    "cosy",
+    "relaxing",
+    "wholesome",
+    "힐링",
+    "아늑",
+    "편안",
+    "잔잔",
+    "relax"
+   ]
+  },
+  "casual": {
+   "label": "캐주얼",
+   "group": "mood",
+   "aliases": [
+    "casual",
+    "캐주얼",
+    "idle",
+    "방치형",
+    "clicker"
+   ]
+  },
+  "hard": {
+   "label": "고난도",
+   "group": "mood",
+   "aliases": [
+    "difficult",
+    "hard",
+    "challenging",
+    "고난도",
+    "어려운",
+    "하드코어",
+    "hardcore",
+    "tough"
+   ]
+  },
+  "anime": {
+   "label": "애니풍",
+   "group": "style",
+   "aliases": [
+    "anime",
+    "애니",
+    "애니메이션",
+    "manga",
+    "만화",
+    "gacha",
+    "가챠"
+   ]
+  },
+  "scifi": {
+   "label": "SF",
+   "group": "setting",
+   "aliases": [
+    "sci-fi",
+    "scifi",
+    "science fiction",
+    "space",
+    "우주",
+    "cyberpunk",
+    "사이버펑크",
+    "mech",
+    "메카",
+    "robot",
+    "로봇"
+   ]
+  },
+  "fantasy": {
+   "label": "판타지",
+   "group": "setting",
+   "aliases": [
+    "fantasy",
+    "판타지",
+    "magic",
+    "마법",
+    "dragon",
+    "용사",
+    "medieval",
+    "중세"
+   ]
+  },
+  "war": {
+   "label": "전쟁/밀리터리",
+   "group": "setting",
+   "aliases": [
+    "war",
+    "military",
+    "전쟁",
+    "밀리터리",
+    "ww2",
+    "wwii",
+    "world war"
+   ]
+  },
+  "dark": {
+   "label": "어두운 분위기",
+   "group": "mood",
+   "aliases": [
+    "dark",
+    "gothic",
+    "어두운",
+    "고딕",
+    "grim",
+    "noir",
+    "느와르",
+    "tense",
+    "긴장"
+   ]
+  },
+  "funny": {
+   "label": "유머",
+   "group": "mood",
+   "aliases": [
+    "funny",
+    "comedy",
+    "humor",
+    "humour",
+    "유머",
+    "웃긴",
+    "개그",
+    "코미디",
+    "meme",
+    "밈",
+    "fail"
+   ]
+  },
+  "beautiful": {
+   "label": "아름다운 풍경",
+   "group": "mood",
+   "aliases": [
+    "beautiful",
+    "scenic",
+    "landscape",
+    "아름다운",
+    "풍경",
+    "경치",
+    "atmospheric",
+    "분위기"
+   ]
+  },
+  "yt-review": {
+   "label": "리뷰/비평",
+   "group": "video",
+   "aliases": [
+    "review",
+    "리뷰",
+    "평가",
+    "후기",
+    "unboxing",
+    "언박싱",
+    "비교"
+   ]
+  },
+  "yt-guide": {
+   "label": "공략/가이드",
+   "group": "video",
+   "aliases": [
+    "guide",
+    "walkthrough",
+    "tutorial",
+    "공략",
+    "가이드",
+    "초보",
+    "팁",
+    "how to",
+    "build guide",
+    "빌드"
+   ]
+  },
+  "yt-lets-play": {
+   "label": "플레이 영상",
+   "group": "video",
+   "aliases": [
+    "let's play",
+    "lets play",
+    "gameplay",
+    "playthrough",
+    "플레이",
+    "실황",
+    "풀영상",
+    "no commentary"
+   ]
+  },
+  "yt-esports": {
+   "label": "e스포츠",
+   "group": "video",
+   "aliases": [
+    "esports",
+    "e-sports",
+    "e스포츠",
+    "worlds",
+    "tournament",
+    "대회",
+    "하이라이트",
+    "highlights",
+    "lck"
+   ]
+  },
+  "yt-music": {
+   "label": "음악",
+   "group": "video",
+   "aliases": [
+    "official mv",
+    "music video",
+    "mv",
+    "ost",
+    "soundtrack",
+    "playlist",
+    "플레이리스트",
+    "lofi",
+    "lo-fi",
+    "노래",
+    "cover",
+    "커버",
+    "live clip"
+   ]
+  },
+  "yt-tech": {
+   "label": "IT/하드웨어",
+   "group": "video",
+   "aliases": [
+    "gpu",
+    "cpu",
+    "pc build",
+    "benchmark",
+    "벤치마크",
+    "조립",
+    "그래픽카드",
+    "rtx",
+    "radeon",
+    "ssd",
+    "monitor",
+    "모니터",
+    "스팀덱",
+    "steam deck",
+    "rog ally",
+    "핸드헬드"
+   ]
+  },
+  "yt-dev": {
+   "label": "개발/코딩",
+   "group": "video",
+   "aliases": [
+    "python",
+    "javascript",
+    "typescript",
+    "coding",
+    "programming",
+    "개발",
+    "코딩",
+    "프로그래밍",
+    "algorithm",
+    "알고리즘",
+    "open source",
+    "linux",
+    "리눅스"
+   ]
+  },
+  "yt-lecture": {
+   "label": "강의/교양",
+   "group": "video",
+   "aliases": [
+    "lecture",
+    "강의",
+    "documentary",
+    "다큐",
+    "explained",
+    "history",
+    "역사",
+    "science",
+    "과학"
+   ]
+  },
+  "yt-cooking": {
+   "label": "요리/음식",
+   "group": "video",
+   "aliases": [
+    "recipe",
+    "레시피",
+    "요리",
+    "cooking",
+    "먹방",
+    "mukbang",
+    "맛집",
+    "food"
+   ]
+  },
+  "yt-vlog": {
+   "label": "브이로그/일상",
+   "group": "video",
+   "aliases": [
+    "vlog",
+    "브이로그",
+    "일상",
+    "daily",
+    "여행",
+    "travel",
+    "asmr"
+   ]
+  },
+  "yt-news": {
+   "label": "뉴스/시사",
+   "group": "video",
+   "aliases": [
+    "news",
+    "뉴스",
+    "시사",
+    "속보",
+    "interview",
+    "인터뷰"
+   ]
+  },
+  "yt-shorts": {
+   "label": "쇼츠/짧은 영상",
+   "group": "video",
+   "aliases": [
+    "#shorts",
+    "shorts",
+    "쇼츠"
+   ]
+  }
+ },
+ "games": [
+  {
+   "names": [
+    "hades",
+    "하데스"
+   ],
+   "appid": 1145360,
+   "tags": [
+    "roguelike",
+    "action",
+    "story",
+    "indie",
+    "fantasy"
+   ]
+  },
+  {
+   "names": [
+    "hades ii",
+    "hades 2",
+    "하데스 2"
+   ],
+   "appid": 1145350,
+   "tags": [
+    "roguelike",
+    "action",
+    "story",
+    "fantasy"
+   ]
+  },
+  {
+   "names": [
+    "hollow knight",
+    "할로우 나이트"
+   ],
+   "appid": 367520,
+   "tags": [
+    "metroidvania",
+    "platformer",
+    "hard",
+    "dark",
+    "indie",
+    "souls-like"
+   ]
+  },
+  {
+   "names": [
+    "celeste",
+    "셀레스트"
+   ],
+   "appid": 504230,
+   "tags": [
+    "platformer",
+    "hard",
+    "pixel",
+    "indie",
+    "story"
+   ]
+  },
+  {
+   "names": [
+    "stardew valley",
+    "스타듀 밸리"
+   ],
+   "appid": 413150,
+   "tags": [
+    "farming",
+    "simulation",
+    "cozy",
+    "pixel",
+    "coop",
+    "indie"
+   ]
+  },
+  {
+   "names": [
+    "terraria",
+    "테라리아"
+   ],
+   "appid": 105600,
+   "tags": [
+    "sandbox",
+    "survival",
+    "adventure",
+    "pixel",
+    "coop"
+   ]
+  },
+  {
+   "names": [
+    "minecraft",
+    "마인크래프트"
+   ],
+   "tags": [
+    "sandbox",
+    "survival",
+    "coop",
+    "multiplayer"
+   ]
+  },
+  {
+   "names": [
+    "elden ring",
+    "엘든 링"
+   ],
+   "appid": 1245620,
+   "tags": [
+    "souls-like",
+    "rpg",
+    "open-world",
+    "hard",
+    "dark",
+    "fantasy"
+   ]
+  },
+  {
+   "names": [
+    "dark souls iii",
+    "dark souls 3",
+    "다크 소울 3"
+   ],
+   "appid": 374320,
+   "tags": [
+    "souls-like",
+    "rpg",
+    "hard",
+    "dark",
+    "fantasy"
+   ]
+  },
+  {
+   "names": [
+    "sekiro",
+    "세키로"
+   ],
+   "appid": 814380,
+   "tags": [
+    "souls-like",
+    "action",
+    "hard"
+   ]
+  },
+  {
+   "names": [
+    "baldur's gate 3",
+    "발더스 게이트 3"
+   ],
+   "appid": 1086940,
+   "tags": [
+    "rpg",
+    "tactical",
+    "story",
+    "fantasy",
+    "coop"
+   ]
+  },
+  {
+   "names": [
+    "slay the spire",
+    "슬레이 더 스파이어"
+   ],
+   "appid": 646570,
+   "tags": [
+    "roguelike",
+    "card",
+    "strategy",
+    "indie"
+   ]
+  },
+  {
+   "names": [
+    "balatro",
+    "발라트로"
+   ],
+   "appid": 2379780,
+   "tags": [
+    "roguelike",
+    "card",
+    "puzzle",
+    "indie"
+   ]
+  },
+  {
+   "names": [
+    "vampire survivors",
+    "뱀파이어 서바이버즈"
+   ],
+   "appid": 1794680,
+   "tags": [
+    "roguelike",
+    "action",
+    "pixel",
+    "casual",
+    "indie"
+   ]
+  },
+  {
+   "names": [
+    "dave the diver",
+    "데이브 더 다이버"
+   ],
+   "appid": 1868140,
+   "tags": [
+    "adventure",
+    "management",
+    "simulation",
+    "pixel",
+    "cozy",
+    "indie"
+   ]
+  },
+  {
+   "names": [
+    "factorio",
+    "팩토리오"
+   ],
+   "appid": 427520,
+   "tags": [
+    "management",
+    "simulation",
+    "strategy",
+    "survival",
+    "coop"
+   ]
+  },
+  {
+   "names": [
+    "portal 2",
+    "포탈 2"
+   ],
+   "appid": 620,
+   "tags": [
+    "puzzle",
+    "scifi",
+    "coop",
+    "funny",
+    "story"
+   ]
+  },
+  {
+   "names": [
+    "counter-strike 2",
+    "counter-strike: global offensive",
+    "cs2",
+    "csgo",
+    "카운터 스트라이크"
+   ],
+   "appid": 730,
+   "tags": [
+    "fps",
+    "multiplayer",
+    "shooter"
+   ]
+  },
+  {
+   "names": [
+    "dota 2",
+    "도타 2"
+   ],
+   "appid": 570,
+   "tags": [
+    "moba",
+    "multiplayer",
+    "strategy"
+   ]
+  },
+  {
+   "names": [
+    "lost ark",
+    "로스트아크"
+   ],
+   "appid": 1599340,
+   "tags": [
+    "mmo",
+    "rpg",
+    "action",
+    "fantasy",
+    "coop"
+   ]
+  },
+  {
+   "names": [
+    "disco elysium",
+    "디스코 엘리시움"
+   ],
+   "appid": 632470,
+   "tags": [
+    "rpg",
+    "story",
+    "dark",
+    "funny"
+   ]
+  },
+  {
+   "names": [
+    "cyberpunk 2077",
+    "사이버펑크 2077"
+   ],
+   "appid": 1091500,
+   "tags": [
+    "rpg",
+    "open-world",
+    "scifi",
+    "story",
+    "action"
+   ]
+  },
+  {
+   "names": [
+    "the witcher 3",
+    "witcher 3",
+    "위처 3"
+   ],
+   "appid": 292030,
+   "tags": [
+    "rpg",
+    "open-world",
+    "fantasy",
+    "story"
+   ]
+  },
+  {
+   "names": [
+    "slay the princess"
+   ],
+   "tags": [
+    "story",
+    "horror",
+    "indie",
+    "dark"
+   ]
+  },
+  {
+   "names": [
+    "it takes two",
+    "잇 테이크스 투"
+   ],
+   "appid": 1426210,
+   "tags": [
+    "coop",
+    "platformer",
+    "adventure",
+    "story",
+    "funny"
+   ]
+  },
+  {
+   "names": [
+    "hotline miami"
+   ],
+   "tags": [
+    "action",
+    "shooter",
+    "pixel",
+    "hard",
+    "indie"
+   ]
+  },
+  {
+   "names": [
+    "cuphead",
+    "컵헤드"
+   ],
+   "appid": 268910,
+   "tags": [
+    "platformer",
+    "hard",
+    "action",
+    "coop",
+    "indie"
+   ]
+  },
+  {
+   "names": [
+    "civilization vi",
+    "civilization 6",
+    "문명 6"
+   ],
+   "appid": 289070,
+   "tags": [
+    "strategy",
+    "management",
+    "tactical"
+   ]
+  },
+  {
+   "names": [
+    "xcom 2"
+   ],
+   "appid": 268500,
+   "tags": [
+    "tactical",
+    "strategy",
+    "scifi",
+    "hard"
+   ]
+  },
+  {
+   "names": [
+    "forza horizon 5",
+    "포르자 호라이즌 5"
+   ],
+   "appid": 1551360,
+   "tags": [
+    "racing",
+    "open-world",
+    "multiplayer",
+    "beautiful"
+   ]
+  },
+  {
+   "names": [
+    "ea sports fc",
+    "fifa",
+    "피파"
+   ],
+   "tags": [
+    "sports",
+    "multiplayer"
+   ]
+  },
+  {
+   "names": [
+    "resident evil 4",
+    "바이오하자드 4"
+   ],
+   "appid": 2050650,
+   "tags": [
+    "horror",
+    "action",
+    "shooter",
+    "story"
+   ]
+  },
+  {
+   "names": [
+    "phasmophobia",
+    "파스모포비아"
+   ],
+   "appid": 739630,
+   "tags": [
+    "horror",
+    "coop",
+    "multiplayer"
+   ]
+  },
+  {
+   "names": [
+    "among us",
+    "어몽 어스"
+   ],
+   "appid": 945360,
+   "tags": [
+    "multiplayer",
+    "casual",
+    "funny",
+    "indie"
+   ]
+  },
+  {
+   "names": [
+    "overwatch 2",
+    "오버워치 2"
+   ],
+   "tags": [
+    "fps",
+    "multiplayer",
+    "shooter",
+    "anime"
+   ]
+  },
+  {
+   "names": [
+    "genshin impact",
+    "원신"
+   ],
+   "tags": [
+    "rpg",
+    "open-world",
+    "anime",
+    "fantasy",
+    "action"
+   ]
+  }
+ ]
+}

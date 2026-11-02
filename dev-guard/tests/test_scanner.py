@@ -109,7 +109,7 @@ class FalsePositiveGuards(unittest.TestCase):
             "secret = secrets.token_hex(32)",
             "api_key = <YOUR_API_KEY>",
             "SECRET_KEY=" + "0" * 32,
-            "SLACK_WEBHOOK=https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX",
+            "SLACK_WEBHOOK=https://hooks." + "slack.com/services/T00000000/B00000000/" + "X" * 24,
             "Authorization: Bearer " + "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
             "DATABASE_URL=postgres://user:password@localhost:5432/db",
             "DATABASE_URL=postgres://user:${DB_PASS}@localhost/db",

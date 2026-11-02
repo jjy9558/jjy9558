@@ -153,6 +153,29 @@ def describe_schedule(sub: dict) -> str:
     return f"매년 {sub['month']}월 {sub['day']}일"
 
 
+def korean_won(amount: int) -> str:
+    """324000 -> '32만4천원' 처럼 말로 읽기 좋게 줄입니다."""
+    amount = int(amount)
+    if amount <= 0:
+        return "0원"
+    eok, rest = divmod(amount, 100_000_000)
+    man, rest = divmod(rest, 10_000)
+    cheon, rest = divmod(rest, 1000)
+    baek, rest = divmod(rest, 100)
+    out = ""
+    if eok:
+        out += f"{eok:,}억"
+    if man:
+        out += f"{man:,}만"
+    if cheon:
+        out += f"{cheon}천"
+    if baek:
+        out += f"{baek}백"
+    if rest:
+        out += f"{rest}"
+    return out + "원"
+
+
 def value_per_man(purchase: dict) -> float:
     """1만원당 만족도 점수. 만족도가 기록된 구매에만 씁니다."""
     return purchase["satisfaction"] * PER_MAN_WON / purchase["price"]
@@ -273,7 +296,8 @@ class Ledger:
     def due_followups(self, today: dt.date) -> List[dict]:
         due = [
             p for p in self.state["purchases"]
-            if p["satisfaction"] is None and followup_date(dt.date.fromisoformat(p["date"])) <= today
+            if p["satisfaction"] is None and p.get("source", "manual") == "manual"
+            and followup_date(dt.date.fromisoformat(p["date"])) <= today
         ]
         return sorted(due, key=lambda p: p["date"])
 
@@ -336,6 +360,24 @@ class Ledger:
         monthly = (yearly + 6) // 12  # 반올림(0.5 이상 올림)
         return {"monthly": monthly, "yearly": yearly, "chickens": yearly // CHICKEN_PRICE}
 
+    def subscription_funeral(self, sub: dict, today: dt.date) -> dict:
+        """삭제한 구독의 결제 횟수와 낸 돈. 등록일(created_at)부터 오늘까지의 결제일을 셉니다."""
+        start = dt.date.fromisoformat(sub["created_at"])
+        count = 0
+        if sub["cycle"] == CYCLE_MONTHLY:
+            y, m = start.year, start.month
+            while (y, m) <= (today.year, today.month):
+                if start <= occurrence(y, m, sub["day"]) <= today:
+                    count += 1
+                y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+        else:
+            for y in range(start.year, today.year + 1):
+                if start <= occurrence(y, sub["month"], sub["day"]) <= today:
+                    count += 1
+        months = (today.year - start.year) * 12 + today.month - start.month
+        return {"payments": count, "total": count * sub["price"], "months": max(months, 0),
+                "from_year": start.year, "to_year": today.year}
+
     def due_renewals(self, today: dt.date, window: int = RENEWAL_WINDOW_DAYS) -> List[Tuple[dict, dt.date, int]]:
         due = []
         for sub in self.state["subscriptions"]:
@@ -369,7 +411,20 @@ class Ledger:
             month = p["date"][:7]
             monthly[month] = monthly.get(month, 0) + p["price"]
         saved_count, saved_total = self.saved_total()
+        sources = {}
+        for p in purchases:
+            entry = sources.setdefault(p.get("source") or "manual", {"count": 0, "total": 0, "scores": []})
+            entry["count"] += 1
+            entry["total"] += p["price"]
+            if p["satisfaction"] is not None:
+                entry["scores"].append(p["satisfaction"])
+        by_source = [
+            {"source": src, "count": e["count"], "total": e["total"], "rated": len(e["scores"]),
+             "avg": sum(e["scores"]) / len(e["scores"]) if e["scores"] else None}
+            for src, e in sources.items()
+        ]
         return {
+            "by_source": by_source,
             "saved_count": saved_count,
             "saved_total": saved_total,
             "purchase_count": len(purchases),

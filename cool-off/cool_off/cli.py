@@ -7,13 +7,16 @@ import datetime as dt
 import sys
 from typing import Callable, List, Optional, Tuple, Union
 
-from . import core
+import os
+
+from . import core, importers
 from .core import CYCLES, LedgerError, Ledger
 from .notify import Notifier, NotifyError
 from .store import DATA_FILE, Store, StoreError, home_dir
 from .text import table, won
 
 PROG = "cool-off"
+CHICKEN_ENV = "COOLOFF_CHICKEN_PRICE"
 
 
 def _money(text: str) -> int:
@@ -48,7 +51,16 @@ def build_parser() -> argparse.ArgumentParser:
     bought.add_argument("--date", default=None, help="YYYY-MM-DD / 오늘 / 어제 (기본 오늘)")
 
     commands.add_parser("list", help="담아 둔 목록 보기")
-    commands.add_parser("report", help="돌아보기 리포트")
+    report = commands.add_parser("report", help="돌아보기 리포트")
+    report.add_argument("--week", action="store_true", help="최근 7일 지출을 치킨 마릿수로 환산한 줄 추가")
+    report.add_argument("--chicken-price", type=_money, default=None,
+                        help=f"치킨 1마리 가격(원). 생략하면 환경변수 {CHICKEN_ENV} 또는 {core.CHICKEN_PRICE:,}원")
+
+    imp_steam = commands.add_parser("import-steam", help="steam-buddy data.json 가져오기 (읽기 전용)")
+    imp_steam.add_argument("path", nargs="?", default=None,
+                           help="data.json 경로 (기본 $STEAM_BUDDY_HOME 또는 ~/.steam-buddy/data.json)")
+    imp_ledger = commands.add_parser("import-ledger", help="paper-butler export-csv --what ledger 파일 가져오기")
+    imp_ledger.add_argument("csv", help="paper-butler 가계부 CSV 경로")
 
     subs = commands.add_parser("sub", help="구독 관리")
     actions = subs.add_subparsers(dest="action", required=True, metavar="동작")
@@ -106,7 +118,7 @@ class App:
             args = parser.parse_args(argv)
         except SystemExit as exc:
             return exc.code if isinstance(exc.code, int) else 2
-        handler = getattr(self, "cmd_" + args.cmd)
+        handler = getattr(self, "cmd_" + args.cmd.replace("-", "_"))
         try:
             ledger = Ledger(self.store.load())
             changed = bool(handler(args, ledger, self._now()))
@@ -270,6 +282,7 @@ class App:
         if args.action == "remove":
             removed = ledger.remove_subscription(args.key)
             self.say(f"구독 삭제: {removed['name']}")
+            self._funeral(removed, ledger.subscription_funeral(removed, now.date()))
             return True
         subs = ledger.state["subscriptions"]
         if not subs:
@@ -294,10 +307,68 @@ class App:
                  f" — 치킨 {totals['chickens']}마리")
         return False
 
+    def _funeral(self, sub: dict, info: dict) -> None:
+        years = str(info["from_year"]) if info["from_year"] == info["to_year"] else f"{info['from_year']}~{info['to_year']}"
+        self.say()
+        if info["payments"] == 0:
+            self.say(f"고 {sub['name']}({years}), 한 푼도 못 받고 떠나다")
+            return
+        self.say(f"고 {sub['name']}({years}), 총 {core.korean_won(info['total'])}을 남기고 떠나다")
+        span = f", {info['months']}개월" if info["months"] else ""
+        self.say(f"  결제 {info['payments']}번{span}, 낸 돈 {won(info['total'])}. 삼가 명복을 빕니다.")
+
+    # ------------------------------------------------------------ 가져오기
+
+    def cmd_import_steam(self, args, ledger: Ledger, now: dt.datetime) -> bool:
+        path = args.path or importers.default_steam_path()
+        res = importers.import_steam(ledger, path)
+        if not (res["added"] or res["duplicate"] or res["skipped"]):
+            self.say(f"가져올 게임이 없어요 (빈 파일): {path}")
+            return False
+        self.say(f"스팀 가져오기: 새로 {res['added']}건, 이미 있음 {res['duplicate']}건"
+                 f"{', 만족도 갱신 %d건' % res['updated'] if res['updated'] else ''}"
+                 f", 건너뜀 {res['skipped']}건 (무료 게임이거나 형식 오류)")
+        return bool(res["added"] or res["updated"])
+
+    def cmd_import_ledger(self, args, ledger: Ledger, now: dt.datetime) -> bool:
+        res = importers.import_ledger_csv(ledger, args.csv)
+        if res["rows"] == 0:
+            self.say(f"가져올 행이 없어요 (빈 파일): {args.csv}")
+            return False
+        self.say(f"가계부 가져오기: 새로 {res['added']}건, 이미 있음 {res['duplicate']}건"
+                 f", 이중 집계라 뺀 것 {res['double']}건, 건너뜀 {res['skipped']}건 (취소 행/형식 오류)")
+        cands = importers.subscription_candidates(ledger)
+        if cands:
+            self.say()
+            self.say(f"== 구독 후보 (같은 가맹점+금액이 {importers.MIN_REPEAT_MONTHS}개월 이상 연속) ==")
+            for c in cands:
+                self.say(f"  {c['name']} {won(c['price'])} — {c['months']}개월 연속 "
+                         f"→ cool-off sub add \"{c['name']}\" {c['price']} --day {c['day']}")
+        return bool(res["added"])
+
     # ------------------------------------------------------------ 리포트
+
+    def _chicken_price(self, args) -> int:
+        if args.chicken_price:
+            return args.chicken_price
+        raw = os.environ.get(CHICKEN_ENV)
+        if raw:
+            return core.parse_money(raw)
+        return core.CHICKEN_PRICE
+
+    def _week_line(self, ledger: Ledger, now: dt.datetime, price: int) -> str:
+        today = now.date()
+        start = today - dt.timedelta(days=6)
+        spent = sum(p["price"] for p in ledger.state["purchases"]
+                    if start <= dt.date.fromisoformat(p["date"]) <= today)
+        return (f"[치킨 환산 주간 보고] 최근 7일({start.isoformat()}~{today.isoformat()}) 지출 {won(spent)}"
+                f" = 치킨 {spent / price:.1f}마리 (1마리 {won(price)})")
 
     def cmd_report(self, args, ledger: Ledger, now: dt.datetime) -> bool:
         rep = ledger.report()
+        if args.week:
+            self.say(self._week_line(ledger, now, self._chicken_price(args)))
+            self.say()
         if rep["purchase_count"] == 0 and rep["saved_count"] == 0:
             self.say("아직 기록이 없어요. `want`로 담고 `bought`로 구매를 기록해 보세요.")
             return False
@@ -311,9 +382,19 @@ class App:
             self.say(f"산 것의 평균 만족도: {rep['avg_satisfaction']:.1f} / 5 (평가 {rep['rated_count']}건)")
         self.say()
 
+        self.say("== 출처별 합계 ==")
+        order = {src: i for i, src in enumerate(importers.SOURCE_ORDER)}
+        rows = []
+        for e in sorted(rep["by_source"], key=lambda e: order.get(e["source"], 99)):
+            avg = f"{e['avg']:.1f}" if e["avg"] is not None else "-"
+            rows.append([importers.SOURCE_LABELS.get(e["source"], e["source"]), e["count"],
+                         won(e["total"]), avg])
+        self.say(table(["출처", "건수", "합계", "평균 만족도"], rows, ["l", "r", "r", "r"]))
+        self.say()
+
         self.say(f"== 후회 목록 (만족도 {core.REGRET_MAX_SATISFACTION} 이하 또는 거의 안 씀) ==")
         if rep["regrets"]:
-            rows = [[p["date"], p["name"], won(p["price"]), p["satisfaction"], p["usage"]]
+            rows = [[p["date"], p["name"], won(p["price"]), p["satisfaction"], p["usage"] or "-"]
                     for p in rep["regrets"]]
             self.say(table(["구매일", "이름", "가격", "만족도", "사용 빈도"], rows,
                            ["l", "l", "r", "r", "l"]))
@@ -325,15 +406,15 @@ class App:
         if rep["ranking"]:
             rows = []
             for rank, p in enumerate(rep["ranking"], start=1):
-                rows.append([rank, p["name"], won(p["price"]), p["satisfaction"],
-                             f"{core.value_per_man(p):.2f}"])
-            self.say(table(["순위", "이름", "가격", "만족도", "1만원당"], rows,
-                           ["r", "l", "r", "r", "r"]))
+                rows.append([rank, p["name"], importers.SOURCE_LABELS.get(importers.source_of(p), "-"),
+                             won(p["price"]), p["satisfaction"], f"{core.value_per_man(p):.2f}"])
+            self.say(table(["순위", "이름", "출처", "가격", "만족도", "1만원당"], rows,
+                           ["r", "l", "l", "r", "r", "r"]))
         else:
             self.say("평가한 것이 없어요.")
         self.say()
 
-        self.say("== 월별 구매 지출 (욕구 구매 기록 기준) ==")
+        self.say("== 월별 구매 지출 (모든 출처 합산) ==")
         rows = [[month, won(total)] for month, total in rep["monthly"]]
         self.say(table(["월", "금액"], rows, ["l", "r"]))
         return False

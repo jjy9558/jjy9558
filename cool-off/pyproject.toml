@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "cool-off"
 version = "0.1.0"
 description = "구매 쿨링오프 + 후회 일기: 담아 두고 기다리기, 산 뒤 만족도 확인, 구독료 총합"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 dependencies = []
 
 [project.scripts]

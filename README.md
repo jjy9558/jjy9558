@@ -33,9 +33,9 @@ Claude Code로 만든 개인 도구 프로젝트들이 모여 있는 곳입니�
 
 - 전체 테스트 실행: `python run_all_tests.py` (`tests/` 폴더가 있는 모든 프로젝트를 실행하고 요약 표를 출력합니다)
 - 일부만 실행하거나 제외: `--only a,b`, `--skip a,b`, 첫 실패 시 중단: `--fail-fast`
-- CI(GitHub Actions)는 push와 PR마다 Ubuntu / Windows × Python 3.9 / 3.12 조합에서 테스트를 실행합니다.
+- CI(GitHub Actions)는 push와 PR마다 Ubuntu / Windows × Python 3.12 / 3.14 조합에서 테스트를 실행합니다.
 
 ## 공통
 
-- 모든 프로젝트는 Python 3.9+ 표준 라이브러리만 사용합니다.
+- 모든 프로젝트는 Python 3.12+ 표준 라이브러리만 사용합니다.
 - 자세한 내용은 각 폴더의 README를 참고하세요.

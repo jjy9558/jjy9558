@@ -32,6 +32,7 @@ def gather(cfg: dict, ctx: Context, only: list[str] | None = None) -> tuple[list
         if not scfg.get("enabled", True):
             statuses[mod.NAME] = _status("disabled", note="설정에서 껐어요")
             continue
+        ctx.notes.pop(mod.NAME, None)
         try:
             got = list(mod.collect(scfg, ctx))
         except SourceSkip as e:
@@ -46,7 +47,7 @@ def gather(cfg: dict, ctx: Context, only: list[str] | None = None) -> tuple[list
                 if not it.section:
                     it.section = mod.SECTION
             items.extend(got)
-            statuses[mod.NAME] = _status("ok", len(got))
+            statuses[mod.NAME] = _status("ok", len(got), ctx.red(ctx.notes.get(mod.NAME, ""))[:160])
     return items, statuses
 
 

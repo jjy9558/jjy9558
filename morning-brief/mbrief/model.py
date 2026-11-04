@@ -48,6 +48,7 @@ class Context:
     opener: Any = None                     # 테스트용 가짜 opener
     env: Mapping[str, str] = field(default_factory=lambda: os.environ)
     redactor: Redactor = field(default_factory=lambda: Redactor())
+    notes: dict = field(default_factory=dict)     # 어댑터 이름 -> 상태표 비고(예: 읽은 방식)
 
     @property
     def tz(self) -> dt.tzinfo:

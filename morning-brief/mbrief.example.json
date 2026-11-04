@@ -9,10 +9,10 @@
     "weights": {"game_calendar": 1.5, "community_briefing": 1.4, "claude_night": 0.7, "voice_journal": 0.8}
   },
   "sources": {
-    "paper_butler": {"enabled": true, "db": "", "lookahead_days": 14, "overdue_days": 7, "refund_days": 14},
-    "game_calendar": {"enabled": true, "state": "../game-calendar/state.json"},
-    "cool_off": {"enabled": true, "data": "", "renewal_days": 3},
-    "voice_journal": {"enabled": true, "db": ""},
+    "paper_butler": {"enabled": true, "mode": "auto", "db": "", "lookahead_days": 14, "overdue_days": 7, "refund_days": 14},
+    "game_calendar": {"enabled": true, "mode": "auto", "state": "../game-calendar/state.json", "gamecal_config": ""},
+    "cool_off": {"enabled": true, "mode": "auto", "data": "", "renewal_days": 3},
+    "voice_journal": {"enabled": true, "mode": "auto", "db": ""},
     "claude_night": {"enabled": true, "projects_dir": "", "start_hour": 23, "end_hour": 9, "ignore_cwd": []},
     "jarvis": {"enabled": false, "url": "http://127.0.0.1:8800", "device": "s21", "token_env": "JARVIS_TOKEN",
                "watch_devices": ["5080"]},

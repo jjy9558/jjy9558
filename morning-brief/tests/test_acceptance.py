@@ -114,7 +114,7 @@ class Acceptance2Isolation(Base):
         self.assertEqual(res.brief["sources"]["paper_butler"]["status"], "ok")
 
     def test_missing_disabled_and_unreachable_hub(self):
-        cfg = self.w.config(sources={**self.cfg["sources"], "cool_off": {"data": str(self.w.root / "none.json")},
+        cfg = self.w.config(sources={**self.cfg["sources"], "cool_off": {"data": str(self.w.root / "none.json"), "mode": "direct"},
                                      "sound_watch": {"enabled": False},
                                      "jarvis": {"device": "s21", "token": TOKEN}})
         op = FakeOpener({"/api/status": OSError("down")})

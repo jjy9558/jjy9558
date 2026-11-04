@@ -79,7 +79,7 @@ blocked goal-due flag claude-blocked claude-night job-approval job-failed jobs-d
 - 낭독문은 마지막에 `speechify` 를 거칩니다: `D-2`→"2일 뒤", `2026-11-05`→"11월 5일", `10:30`→"오전 10시 30분", `45,200원`→"4만 5천 2백원", URL/마크다운 제거.
 - `preview --seconds 120` 은 상한 없이 120초(600자) 기준으로 어디까지 읽히는지 보여 줍니다(계약 파일에는 300자만 담깁니다).
 
-## 어댑터 (실제 저장 형식을 읽어 맞춘 것)
+## 어댑터 (JSON 계약 우선, 실제 저장 형식 직접 읽기는 대비책)
 
 각 어댑터는 `collect(cfg, ctx) -> list[Item]` 이고 하나가 죽어도 나머지는 나옵니다(상태 `error`, `sources` 에 ❌).
 상태: ✅ ok / ➖ 꺼짐 / ⏸ 건너뜀(dry-run) / ⚠ 연결 안 됨(파일·설정 없음) / ❌ 오류.
@@ -97,6 +97,35 @@ blocked goal-due flag claude-blocked claude-night job-approval job-failed jobs-d
 
 다른 프로젝트 코드는 import 하지 않고 형식만 따랐습니다. 형식이 바뀌면 해당 어댑터가 `error` 로 표시되며 나머지는 계속 갑니다.
 토큰은 설정 파일의 `token` 이나 환경변수(`SIDEKICK_TOKEN`, `NTFY_TOKEN`, `JARVIS_TOKEN`)로 줍니다. 저장소에 올리지 마세요.
+
+### JSON 계약 모드 (`paper_butler`, `game_calendar`, `voice_journal`, `cool_off`)
+
+네 형제 프로젝트는 안정된 JSON 출력(schema v1, 각자 `<pkg>/contract.py` 의 `validate()`)을 내므로, 이 네 어댑터는 파일 형식을 직접 읽기보다
+그 명령을 먼저 씁니다. 어댑터 설정의 `mode`:
+
+| mode | 동작 |
+|---|---|
+| `auto` (기본) | JSON 명령을 먼저 쓰고, 실패하면 경고를 남기고 기존 직접 읽기로 되돌아갑니다 |
+| `json` | JSON 명령만 씁니다. 실패하면 상태 `error` |
+| `direct` | 명령을 부르지 않고 기존처럼 파일/DB 를 직접 읽습니다 (동작 변화 없음) |
+
+| 어댑터 | 부르는 명령 | 데이터 위치를 넘기는 법 |
+|---|---|---|
+| `paper_butler` | `paperbutler --today D due --json --days N --overdue-days M` (납부), `... refunds --json --days K` (환불) | `db` 가 있으면 그 폴더를 `PAPERBUTLER_HOME` 으로 |
+| `game_calendar` | `gamecal alerts --json --days N [--config <gamecal_config>]` | gamecal 의 설정(`gamecal_config`, 기본은 실행 폴더의 `gamecal.json`). `state` 는 direct 전용 |
+| `voice_journal` | `vjournal morning --json --date D` | `db` 가 있으면 `VJOURNAL_DB` |
+| `cool_off` | `cool_off check --json` (비대화형, 읽기 전용) | `data` 가 있으면 그 폴더를 `COOLOFF_HOME` |
+
+- 실행은 인자 목록, `shell=False`, `timeout`(기본 20초)으로만 합니다. 환경변수는 그대로 물려주고(데이터 폴더 변수 포함) 위 표의 값만 덮어씁니다.
+- 명령 찾기: 설정 `command: ["python3", "-m", "pkg"]` 가 있으면 그것, 없으면 `[현재 파이썬, "-m", <pkg>]`. 작업 폴더(`cwd`)는 설정값, 없으면 형제 폴더
+  `../<프로젝트>` 가 있을 때 그곳, 그것도 없으면 설치된 패키지에 맡깁니다.
+- 출력은 JSON 이고 `version == 1` 이어야 합니다. 모르는 버전, 깨진 JSON, 모양 불일치, 비정상 종료, 시간 초과, **기준일이 mbrief 의 오늘과 다름**(`--date` 로 다른
+  날 브리핑을 만들 때 `gamecal`/`cool_off` 는 날짜를 못 받습니다)이면 `auto` 에서는 직접 읽기로 되돌아갑니다.
+- **어느 방식이 쓰였는지**는 `sources.<이름>.note` 에 남습니다: `모드: json`, `모드: direct`, `모드: direct (json 실패: 이유)`. `brief-latest.json` 의 키는 그대로입니다.
+- `game_calendar`: 진행 중(`ongoing`) 이벤트는 `ends_in_days` 로 "이벤트 이틀 뒤 종료"처럼 말합니다(종일 일정의 `ends_in_days` 는 배타적 끝 기준이라 마지막 날은 하루 적게 셉니다).
+  서비스 종료는 gamecal 쪽이 60일 고정이라 `shutdown_days` 가 그보다 크면 60일까지만 보입니다. `patch` 는 브리핑 대상이 아닙니다.
+- 직접 읽기와의 차이: `voice_journal` 은 JSON 에 퇴근 3문답의 "막힌 것"이 없어 json 방식에서는 빠지고, 첫 할 일은 어제 기록한 것만 나옵니다.
+  `cool_off` 의 쿨링오프 끝 항목은 JSON 에 사유(`why`)와 시각이 없습니다. 원본 파일이 없을 때 직접 읽기는 "연결 안 됨"이지만 JSON 명령은 빈 목록을 돌려줍니다.
 
 ## 데이터와 개인정보
 
@@ -123,5 +152,5 @@ cd morning-brief
 python -m unittest discover -s tests -v
 ```
 
-네트워크 없이 돕니다(가짜 opener, 임시 폴더). 어댑터별 픽스처는 `tests/fixtures/` 에 있고 sqlite 는 원본 프로젝트의 `SCHEMA` 를 그대로 가져온 `.sql` 을 임시 DB 로 만들어 씁니다.
+네트워크 없이 돕니다(가짜 opener, 임시 폴더, 가짜 JSON 명령 스크립트). 기존 어댑터 테스트는 `mode: direct` 로 고정하고, `tests/test_json_mode.py` 가 json/되돌아가기/direct 를 어댑터마다 확인하며 실제 형제 프로젝트의 `--json` 을 빈 데이터 폴더로 한 번씩 부릅니다(형제 폴더가 없으면 건너뜀). 어댑터별 픽스처는 `tests/fixtures/` 에 있고 sqlite 는 원본 프로젝트의 `SCHEMA` 를 그대로 가져온 `.sql` 을 임시 DB 로 만들어 씁니다.
 plan-v2 D-1 인수 테스트(우선순위·예산 / 어댑터 격리 / mode=ro 불변 / dry-run 네트워크 0 / 같은 날 재실행 동일)와 낭독 변환, 계약 스키마 테스트가 `tests/test_acceptance.py` 에 있습니다.

@@ -96,6 +96,46 @@ python -m vjournal export 2026-11 --out 2026-11.md
 
 날짜별 기록 + 3문답 + 이 달의 선언 현황을 담습니다.
 
+## JSON 출력(다른 도구 연동용)
+
+```bash
+python -m vjournal morning --json                  # 오늘 기준
+python -m vjournal morning --json --date 2026-11-03  # 기준일 지정 (텍스트 morning 에도 --date 적용)
+```
+
+stdout 에 JSON 객체 하나를 씁니다. `version` 은 스키마 버전이며(현재 `1`, `vjournal/contract.py` 의 `SCHEMA_VERSION`), 키 집합은 정확히 아래와 같습니다. 키를 바꾸면 버전을 올립니다.
+
+```json
+{
+  "version": 1,
+  "date": "2026-11-03",
+  "first_task": "내일 눈 뜨자마자 PR 리뷰",
+  "goals_yesterday": [
+    {"id": 1, "text": "매일 푸시업 30개", "result": "partial", "progress": "12/30개"}
+  ],
+  "goals_due_soon": [
+    {"id": 4, "text": "발표 준비", "deadline": "2026-11-03", "days_left": 0}
+  ],
+  "flags": [
+    {"id": 7, "text": "세금 서류 챙기기 #중요", "created": "2026-11-02T18:30:00"}
+  ]
+}
+```
+
+| 키 | 내용 |
+|---|---|
+| `date` | 기준일 (기본 오늘) |
+| `first_task` | 어제 "내일 첫 할 일" 답. 없으면 `null` (일반 `morning` 과 달리 며칠 전 것으로 거슬러 올라가지 않음) |
+| `goals_yesterday` | 어제 기준 목표 결과. `result` 는 `done` / `partial` / `missed` / `dropped` |
+| `goals_due_soon` | 열린 목표 중 마감이 기준일 또는 다음 날인 것 (`days_left` 는 0 또는 1, 기존 `morning` 과 같은 범위) |
+| `flags` | 표시한 기록 중 기준일 이전 14일 이내 것. `created` 는 로컬 시각의 ISO 8601 (시간대 없음) |
+
+`goals_yesterday` 규칙: 어제 접었으면 `dropped`, 어제 완료했으면 `done`. 어제 진행이 있으면 매일 목표는 목표치 이상이면 `done`, 그 밖은 `partial`. 어제 진행이 없으면 기한 전의 매일 목표와 어제가 기한인 선언은 `missed`. 그 밖(주간 목표 등 어제 진행이 없는 것)은 목록에서 뺍니다. `progress` 는 `"12/30개"`, `"접음"`, `"완료"` 같은 짧은 문자열입니다.
+
+- 모든 텍스트 필드는 일반 출력과 같은 마스킹(`redact.py`)을 거칩니다.
+- 출력은 저장 전에 스키마 검증(`vjournal/contract.py` 의 `validate`)을 통과해야 나갑니다. 실패하면 오류로 끝납니다.
+- 잘못된 `--date` 형식은 stderr 에 오류를 쓰고 종료 코드 1을 돌려줍니다.
+
 ## HTTP 서버
 
 ```bash

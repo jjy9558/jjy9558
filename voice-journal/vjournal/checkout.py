@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """퇴근 전 3문답 + 아침 브리핑."""
-from datetime import timedelta
+from datetime import date, datetime, timedelta
+
+from .contract import SCHEMA_VERSION, validate
+from .store import TS_FMT
 
 KEYS = ("win", "blocked", "next")
 
@@ -89,3 +92,94 @@ def render_morning(m):
             first = e["text"].splitlines()[0]
             lines.append("  - #%d [%s] %s" % (e["id"], e["day"], first[:80]))
     return "\n".join(lines)
+
+
+# --- JSON (morning --json, 다른 도구 연동) ------------------------------------
+# 기준일 day 의 아침 브리핑. "어제" = day - 1. 모든 텍스트는 red(Redactor) 를 거친다.
+
+def _num(x):
+    x = float(x)
+    return str(int(x)) if x == int(x) else "%.1f" % x
+
+
+def _progress_text(got, target, unit):
+    if target:
+        return "%s/%s%s" % (_num(got), _num(target), unit)
+    return "%s%s" % (_num(got), unit)
+
+
+def _ended_before(g, iso):
+    """iso 날짜 이전에 이미 완료되었거나 접힌 목표인가."""
+    if g["status"] == "done" and g["done_day"] and g["done_day"] < iso:
+        return True
+    return g["status"] == "dropped" and bool(g["dropped_day"]) and g["dropped_day"] < iso
+
+
+def _goals_yesterday(journal, day, red):
+    """어제 활성이었던 목표의 결과. 규칙:
+    - 어제 접음 -> dropped / 어제 완료 -> done
+    - 어제 진행 있음 -> 매일 목표는 목표치 이상이면 done, 그 밖은 partial
+    - 어제 진행 없음 -> 매일 목표(기한 전)와 어제가 기한인 목표는 missed
+    - 그 밖(주간 목표 무진행 등)은 제외
+    """
+    y = day - timedelta(days=1)
+    yi = y.isoformat()
+    out = []
+    for g in journal.goals():
+        if g["created_day"] > yi or _ended_before(g, yi):
+            continue
+        got = sum(a for d, a in journal.goal_events(g["id"]) if d == yi)
+        target, unit = g["target"], g["unit"] or ""
+        if g["status"] == "dropped" and g["dropped_day"] == yi:
+            result, progress = "dropped", "접음"
+        elif g["status"] == "done" and g["done_day"] == yi:
+            result = "done"
+            progress = _progress_text(got, target, unit) if got else "완료"
+        elif got > 0:
+            result = "done" if (g["period"] == "day" and got >= (target or 1)) else "partial"
+            progress = _progress_text(got, target, unit)
+        elif g["period"] == "day" and (g["start_day"] or g["created_day"]) <= yi \
+                and (not g["deadline"] or g["deadline"] >= yi):
+            result, progress = "missed", _progress_text(0, target, unit)
+        elif g["period"] == "once" and g["deadline"] == yi:
+            result, progress = "missed", _progress_text(0, target, unit)
+        else:
+            continue
+        out.append({"id": g["id"], "text": red.redact(g["title"]), "result": result, "progress": progress})
+    return out
+
+
+def _goals_due_soon(journal, day, red):
+    """열린 목표 중 마감이 오늘·내일인 것 (기존 morning 과 같은 범위)."""
+    end = day + timedelta(days=1)
+    out = []
+    for g in journal.goals("open"):
+        if g["deadline"] and day.isoformat() <= g["deadline"] <= end.isoformat():
+            out.append({"id": g["id"], "text": red.redact(g["title"]), "deadline": g["deadline"],
+                        "days_left": (date.fromisoformat(g["deadline"]) - day).days})
+    return out
+
+
+def _flags(journal, day, red):
+    """표시 항목 중 최근 14일 이내, 기준일 이전(포함) 것. created 는 로컬 시각 naive ISO 8601."""
+    out = []
+    for e in journal.flagged(day - timedelta(days=14)):
+        if e["day"] > day.isoformat():
+            continue
+        out.append({"id": e["id"], "text": red.redact(e["text"]),
+                    "created": datetime.strptime(e["ts"], TS_FMT).isoformat()})
+    return out
+
+
+def morning_payload(journal, day, red):
+    """`morning --json` 의 dict. 스키마 검증을 거쳐서 돌려준다."""
+    nxt = journal.checkout_answers(day - timedelta(days=1)).get("next")
+    first = red.redact(nxt.strip()) if nxt and nxt.strip() else None
+    return validate({
+        "version": SCHEMA_VERSION,
+        "date": day.isoformat(),
+        "first_task": first,
+        "goals_yesterday": _goals_yesterday(journal, day, red),
+        "goals_due_soon": _goals_due_soon(journal, day, red),
+        "flags": _flags(journal, day, red),
+    })

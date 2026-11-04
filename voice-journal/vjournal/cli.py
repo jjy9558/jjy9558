@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import argparse
+import json
 import os
 import sys
 from datetime import date, datetime, timedelta
@@ -42,7 +43,9 @@ def build_parser():
     c.add_argument("--blocked")
     c.add_argument("--next", dest="next_")
 
-    sub.add_parser("morning", help="아침 브리핑")
+    m = sub.add_parser("morning", help="아침 브리핑")
+    m.add_argument("--json", action="store_true", help="JSON 출력 (다른 도구 연동용, schema v1)")
+    m.add_argument("--date", help="기준일 YYYY-MM-DD (기본: 오늘)")
 
     g = sub.add_parser("goals", help="선언 목록 / 수동 갱신")
     g.add_argument("action", nargs="?", choices=["list", "done", "progress", "drop"], default="list")
@@ -158,7 +161,12 @@ def _dispatch(args, j, stdin, ask, llm):
         C.run_checkout(j, askf, _out)
         return 0
     if cmd == "morning":
-        _out(C.render_morning(C.morning(j)))
+        day = _parse_day(args.date) if args.date else None
+        if args.json:
+            payload = C.morning_payload(j, day or j.today(), Redactor())
+            _out(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            _out(C.render_morning(C.morning(j, today=day)))
         return 0
     if cmd == "goals":
         if args.action == "list":

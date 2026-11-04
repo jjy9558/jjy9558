@@ -60,6 +60,9 @@ $ python3 -m paperbutler add -
 | `show <id>` / `done <id> [--undo]` | 상세 보기 / 납부(처리) 완료 표시 |
 | `refunds [--days 30] [--json]` | 환불·반품 기한 목록 (`--json`: 기계용 출력) |
 | `doctor` | pdftotext / tesseract / LLM 사용 가능 여부 점검 |
+| `budget set [--income 월급] [--fixed 40%] [--living 40%] [--save 20%] [--map 봉투=카테고리,..] [--thresholds 70,90,100]` | 월급 3봉투 나누기 (비율 `%` 또는 금액, `250만` 표기 가능) |
+| `budget show [--month YYYY-MM]` | 봉투별 쓴 돈/남은 돈 막대그래프, 남은 날, 하루 쓸 수 있는 돈 |
+| `budget alarm [--ntfy TOPIC] [--json] [--dry-run]` | 예산 비상벨: 70/90/100% 를 새로 넘은 봉투 경보 |
 
 ## JSON 출력(다른 도구 연동용)
 
@@ -102,6 +105,55 @@ python3 -m paperbutler refunds --days 14 --json      # 환불·반품 기한만
 - **마스킹**: 텍스트 출력과 같은 규칙으로 마스킹합니다(전화번호·계좌·주민번호 등은 `010-****-5678` 형태). 고객번호는 항목에 넣지 않습니다.
 - **버전 정책**: 필드를 추가·삭제·이름 변경하거나 타입을 바꾸면 `version` 을 올립니다. 소비자는 `version` 이 기대한 값인지 먼저 확인하세요.
 - **검증**: `paperbutler.contract.validate(obj)` 가 위 규칙(키 집합, 타입, `days_left` 계산, 정렬)을 검사합니다. 어긋나면 `ValueError` 를 던집니다.
+
+## 월급 3봉투 · 예산 비상벨
+
+월급을 **고정비 / 생활비 / 저축** 세 봉투로 나누고, 기존 가계부(승인 − 취소)로 봉투별 소진율을 봅니다.
+
+```bash
+python3 -m paperbutler budget set --income 2500000 --fixed 40% --living 40% --save 20%
+python3 -m paperbutler budget set --income 250만 --fixed 1000000 --living 45% --save 500000   # 금액·비율 섞어 쓰기
+python3 -m paperbutler budget show                    # 이번 달 (--month 2026-10 도 가능)
+python3 -m paperbutler budget alarm --ntfy my-topic   # cron 에 걸어 두면 비상벨
+```
+
+```
+== 2026-11 월급 3봉투 ==
+봉투    소진                   %   쓴 돈 / 예산         남은 돈
+------  --------------------  ---  -------------------  ---------------------
+고정비  ███░░░░░░░░░░░░░░░░░   18%  180,000원 / 1,000,000원  남음 820,000원
+생활비  ██████████████░░░░░░   72%  720,000원 / 1,000,000원  남음 280,000원
+저축    (지출 추적 안 함)              목표 500,000원          월급날 먼저 떼어 두기
+이번 달 남은 날: 27일 (오늘 포함)
+하루 쓸 수 있는 돈: 10,370원 (생활비 남은 돈 ÷ 남은 날)
+```
+
+- **카테고리 매핑**: 기본은 고정비=공과금·구독·의료·교육, 생활비=식비·교통·쇼핑·문화·기타, 저축=없음(지출 추적 안 함).
+  `--map 생활비=식비,교통` 으로 바꾸거나 `<home>/budget.json` 의 `categories` 를 직접 고쳐도 됩니다. 한 카테고리는 한 봉투에만 넣을 수 있고,
+  어느 봉투에도 없는 카테고리는 `show` 에 "매핑 안 된 카테고리" 로 따로 표시합니다.
+- **계산**: 월 단위(`YYYY-MM`)로 집계합니다. 짝이 있는 취소는 승인과 상쇄되고, 짝 없는 취소는 환불로 차감합니다(가계부와 동일).
+  비율은 `월급 × % ÷ 100` 의 내림입니다. 비율 합이 100% 를 넘으면 오류, 금액 합이 월급을 넘으면 주의 문구만 냅니다.
+- **하루 쓸 수 있는 돈** = 생활비 봉투 남은 돈 ÷ 이번 달 남은 날(오늘 포함). 초과했으면 0원입니다.
+- **비상벨 기준선**: 기본 70/90/100% (`--thresholds` 로 변경). 달·봉투·기준선마다 **한 번만** 알립니다
+  (기록: `<home>/budget-alarms.json`, 새 달이면 다시 시작). 한 번에 여러 기준선을 넘으면 가장 높은 것만 알리고 낮은 것도 보낸 것으로 기록합니다.
+  저축처럼 추적하지 않는 봉투는 경보 대상이 아닙니다. 미리보기만 보려면 `--dry-run`.
+- **ntfy**: `--ntfy TOPIC` 이면 같은 문구를 푸시로도 보냅니다. 전송이 실패해도 명령은 성공(종료 코드 0)하며, 실패한 경보는
+  기록하지 않아 다음 실행에서 다시 시도합니다. 푸시 본문에는 봉투 이름·퍼센트·남은 돈만 들어가고 카드/계좌 번호는 들어가지 않습니다.
+  (ntfy 전송에는 `paperbutler/_jjkit/notify.py` 를 쓰며 Python 3.10+ 가 필요합니다. 나머지 기능은 그대로 3.9+ 입니다.)
+- **`budget alarm --json`**: `due --json` 과 별개의 스키마입니다(`paperbutler/contract.py` 의 `BUDGET_VERSION`, `validate_budget`).
+  기존 `SCHEMA_VERSION` 과 `due`/`refunds` 출력은 바뀌지 않았습니다.
+
+```json
+{"version": 1, "kind": "budget", "generated_for": "2026-11-04", "month": "2026-11",
+ "days_left": 27, "daily_allowance": 10370,
+ "envelopes": [{"key": "living", "name": "생활비", "budget": 1000000, "spent": 910000,
+                "remaining": 90000, "percent": 91, "crossed": [70, 90]}],
+ "alerts": [{"envelope": "생활비", "threshold": 90, "percent": 91,
+             "message": "생활비 봉투 90% 소진. 이번 주는 편의점 출입 금지 권고 (남은 돈 90,000원)", "ntfy": "off"}]}
+```
+
+`ntfy` 는 `off`(전송 안 함) / `sent` / `failed`. `crossed` 는 지금 넘어 있는 기준선 전체, `alerts` 는 이번 실행에서 새로 알린 것입니다.
+JSON 모드에서도 경보 기록은 남으므로, 미리보기는 `--dry-run` 을 함께 쓰세요.
 
 ## S21 카메라 → 공유 폴더 → inbox 워크플로
 

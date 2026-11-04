@@ -98,6 +98,23 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--days", type=int, default=30)
     p.add_argument("--json", action="store_true", help="기계용 JSON 출력 (스키마는 README 참고)")
 
+    p = sub.add_parser("budget", parents=[common], help="월급 3봉투(고정비·생활비·저축)와 예산 비상벨")
+    bsub = p.add_subparsers(dest="budget_cmd", metavar="하위명령")
+    q = bsub.add_parser("set", parents=[common], help="월급과 봉투 나누기 (비율 40%% 또는 금액)")
+    q.add_argument("--income", help="월급 (예: 2500000, 250만)")
+    q.add_argument("--fixed", help="고정비 봉투: 40%% 또는 금액")
+    q.add_argument("--living", help="생활비 봉투: 40%% 또는 금액")
+    q.add_argument("--save", help="저축 봉투: 20%% 또는 금액")
+    q.add_argument("--map", action="append", default=[], metavar="봉투=카테고리,...",
+                   help="카테고리 매핑 바꾸기 (예: 생활비=식비,교통,쇼핑). 여러 번 가능")
+    q.add_argument("--thresholds", help="경보 기준선 % (기본 70,90,100)")
+    q = bsub.add_parser("show", parents=[common], help="봉투별 쓴 돈/남은 돈, 하루 쓸 수 있는 돈")
+    q.add_argument("--month", help="YYYY-MM (기본: 이번 달)")
+    q = bsub.add_parser("alarm", parents=[common], help="기준선(70/90/100%%)을 새로 넘은 봉투 경보 (달·기준선당 1회)")
+    q.add_argument("--ntfy", metavar="TOPIC", help="ntfy 토픽으로도 보내기 (실패해도 명령은 성공)")
+    q.add_argument("--json", action="store_true", help="기계용 JSON 출력 (budget 스키마 v1)")
+    q.add_argument("--dry-run", action="store_true", help="경보 기록을 남기지 않고 미리보기만")
+
     sub.add_parser("doctor", parents=[common], help="사용 가능한 입력 도구(pdftotext/tesseract/LLM) 점검")
     return ap
 
@@ -369,6 +386,73 @@ def cmd_refunds(b: Butler, a: argparse.Namespace) -> int:
     return 0
 
 
+def _budget_cfg(b: Butler) -> Any:
+    from . import budget as bg
+    cfg = bg.load_config(b.cfg.home)
+    if cfg is None:
+        err("예산이 아직 없습니다. 먼저: budget set --income 2500000 --fixed 40% --living 40% --save 20%")
+    return cfg
+
+
+def cmd_budget(b: Butler, a: argparse.Namespace) -> int:
+    from . import budget as bg
+    sub = getattr(a, "budget_cmd", None)
+    if not sub:
+        err("budget 하위 명령: set / show / alarm")
+        return 2
+    try:
+        if sub == "set":
+            cfg, notes = bg.set_config(
+                b.cfg.home, a.income, {"fixed": a.fixed, "living": a.living, "save": a.save}, a.map, a.thresholds)
+            emit("== 월급 3봉투 저장 (월급 %s) ==" % won(cfg["income"]))
+            for k in bg.KEYS:
+                cats = ", ".join(cfg["envelopes"][k]["categories"]) or "(지출 추적 안 함)"
+                emit("  %s: %s  ← %s" % (bg.NAMES[k], won(bg.envelope_amount(cfg, k)), cats))
+            emit("  경보 기준선: " + ", ".join("%d%%" % t for t in cfg["thresholds"]))
+            for n in notes:
+                emit("  주의: " + n)
+            return 0
+        cfg = _budget_cfg(b)
+        if cfg is None:
+            return 1
+        month = getattr(a, "month", None) or b.today.strftime("%Y-%m")
+        if len(month) != 7 or month[4] != "-" or not (month[:4] + month[5:]).isdigit() or not 1 <= int(month[5:]) <= 12:
+            err("--month 는 YYYY-MM 형식이어야 합니다 (예: 2026-11).")
+            return 2
+        info = bg.compute(cfg, b.ledger(month), month, b.today)
+        if sub == "show":
+            for line in bg.render(info):
+                emit(line)
+            return 0
+        send = None
+        if a.ntfy:
+            def send(title: str, msg: str) -> None:
+                (ntfy_send or _default_ntfy)(a.ntfy, msg, title)
+        alerts = bg.run_alarm(b.cfg.home, cfg, info, send, a.dry_run)
+        if a.json:
+            _emit_json(bg.payload(b.today, info, alerts))
+            return 0
+        if not alerts:
+            top = max(info["envelopes"], key=lambda e: e["percent"] if e["tracked"] else -1)
+            emit("새 경보 없음. 가장 많이 쓴 봉투: %s %d%%" % (top["name"], top["percent"]))
+        for al in alerts:
+            emit("[%s %d%%] %s" % (al["envelope"], al["threshold"], al["message"]))
+            if al["ntfy"] == "failed":
+                err("ntfy 전송에 실패했습니다. 경보는 기록하지 않았으니 다음 실행에서 다시 시도합니다.")
+        return 0
+    except bg.BudgetError as e:
+        err("[오류] %s" % e)
+        return 2
+
+
+def _default_ntfy(topic: str, message: str, title: str) -> None:
+    from ._jjkit import notify
+    notify.ntfy(topic, message, title=title)
+
+
+ntfy_send: Any = None   # main(ntfy_send=...) 로 테스트에서 바꿔 끼운다
+
+
 def cmd_doctor(b: Butler, a: argparse.Namespace) -> int:
     cfg = b.cfg
     emit("데이터 폴더: %s" % cfg.home)
@@ -382,11 +466,11 @@ def cmd_doctor(b: Butler, a: argparse.Namespace) -> int:
 COMMANDS = {
     "add": cmd_add, "due": cmd_due, "ledger": cmd_ledger, "export-csv": cmd_export, "ics": cmd_ics,
     "find": cmd_find, "inbox": cmd_inbox, "show": cmd_show, "done": cmd_done, "refunds": cmd_refunds,
-    "doctor": cmd_doctor,
+    "doctor": cmd_doctor, "budget": cmd_budget,
 }
 
 
-def main(argv: Optional[Sequence[str]] = None, *, llm: Any = None) -> int:
+def main(argv: Optional[Sequence[str]] = None, *, llm: Any = None, ntfy_send: Any = None) -> int:
     ap = build_parser()
     a = ap.parse_args(argv)
     if not a.cmd:
@@ -399,6 +483,7 @@ def main(argv: Optional[Sequence[str]] = None, *, llm: Any = None) -> int:
         except ValueError:
             err("--today 는 YYYY-MM-DD 형식이어야 합니다.")
             return 2
+    globals()["ntfy_send"] = ntfy_send
     cfg = Config.load(a.home)
     handlers = _setup_logging(str(cfg.home), a.verbose)
     try:

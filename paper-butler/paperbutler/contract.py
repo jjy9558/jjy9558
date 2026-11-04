@@ -74,9 +74,62 @@ def validate(obj: Any) -> Dict[str, Any]:
     return obj
 
 
+# -- budget alarm (--json) 페이로드: 자체 version 을 가진다. SCHEMA_VERSION 은 그대로. -----------
+BUDGET_VERSION = 1
+BUDGET_TOP_KEYS = frozenset({"version", "kind", "generated_for", "month", "days_left", "daily_allowance",
+                             "envelopes", "alerts"})
+BUDGET_ENVELOPE_KEYS = ("key", "name", "budget", "spent", "remaining", "percent", "crossed")
+BUDGET_ALERT_KEYS = frozenset({"envelope", "threshold", "percent", "message", "ntfy"})
+NTFY_STATES = ("off", "sent", "failed")
+
+
+def validate_budget(obj: Any) -> Dict[str, Any]:
+    """budget alarm --json 출력이 budget 스키마 v1 을 만족하는지 검사한다. 어긋나면 ValueError."""
+    if not isinstance(obj, dict) or set(obj) != BUDGET_TOP_KEYS:
+        raise ValueError("budget 최상위 키는 %s 여야 합니다" % sorted(BUDGET_TOP_KEYS))
+    if not _is_int(obj["version"]) or obj["version"] != BUDGET_VERSION:
+        raise ValueError("budget version 은 %d 이어야 합니다" % BUDGET_VERSION)
+    if obj["kind"] != "budget":
+        raise ValueError("kind 는 'budget' 이어야 합니다")
+    _date(obj["generated_for"], "generated_for")
+    m = obj["month"]
+    if not isinstance(m, str) or len(m) != 7 or m[4] != "-" or not (m[:4] + m[5:]).isdigit():
+        raise ValueError("month 는 YYYY-MM 이어야 합니다: %r" % (m,))
+    for k in ("days_left", "daily_allowance"):
+        if not _is_int(obj[k]) or obj[k] < 0:
+            raise ValueError("%s 는 0 이상의 정수여야 합니다" % k)
+    if not isinstance(obj["envelopes"], list) or not isinstance(obj["alerts"], list):
+        raise ValueError("envelopes/alerts 는 배열이어야 합니다")
+    for i, e in enumerate(obj["envelopes"]):
+        w = "envelopes[%d]" % i
+        if not isinstance(e, dict) or set(e) != set(BUDGET_ENVELOPE_KEYS):
+            raise ValueError("%s: 키는 %s 여야 합니다" % (w, sorted(BUDGET_ENVELOPE_KEYS)))
+        for k in ("key", "name"):
+            if not isinstance(e[k], str):
+                raise ValueError("%s.%s 는 문자열이어야 합니다" % (w, k))
+        for k in ("budget", "spent", "remaining", "percent"):
+            if not _is_int(e[k]):
+                raise ValueError("%s.%s 는 정수여야 합니다" % (w, k))
+        if e["remaining"] != e["budget"] - e["spent"]:
+            raise ValueError("%s.remaining 은 budget - spent 와 같아야 합니다" % w)
+        if not isinstance(e["crossed"], list) or not all(_is_int(x) for x in e["crossed"]):
+            raise ValueError("%s.crossed 는 정수 배열이어야 합니다" % w)
+    for i, a in enumerate(obj["alerts"]):
+        w = "alerts[%d]" % i
+        if not isinstance(a, dict) or set(a) != BUDGET_ALERT_KEYS:
+            raise ValueError("%s: 키는 %s 여야 합니다" % (w, sorted(BUDGET_ALERT_KEYS)))
+        if not isinstance(a["envelope"], str) or not isinstance(a["message"], str):
+            raise ValueError("%s: envelope/message 는 문자열이어야 합니다" % w)
+        if not _is_int(a["threshold"]) or not _is_int(a["percent"]):
+            raise ValueError("%s: threshold/percent 는 정수여야 합니다" % w)
+        if a["ntfy"] not in NTFY_STATES:
+            raise ValueError("%s.ntfy 는 %s 중 하나여야 합니다" % (w, NTFY_STATES))
+    return obj
+
+
 def sort_key(item: Dict[str, Any]) -> tuple:
     """due 오름차순, 같으면 kind(bill 먼저), doc_id 순."""
     return (item["due"], KINDS.index(item["kind"]), item["doc_id"])
 
 
-__all__: List[str] = ["SCHEMA_VERSION", "KIND_BILL", "KIND_REFUND", "KINDS", "validate", "sort_key"]
+__all__: List[str] = ["SCHEMA_VERSION", "KIND_BILL", "KIND_REFUND", "KINDS", "validate", "sort_key", "BUDGET_VERSION", "validate_budget"]

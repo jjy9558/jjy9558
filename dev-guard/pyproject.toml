@@ -13,4 +13,4 @@ dependencies = []
 devguard = "devguard.cli:main"
 
 [tool.setuptools]
-packages = ["devguard"]
+packages = ["devguard", "devguard._jjkit"]

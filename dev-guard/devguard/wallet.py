@@ -15,7 +15,9 @@ import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Tuple
+from urllib.parse import urlsplit
 
+from devguard._jjkit import notify
 from devguard.config import deep_merge, devguard_home, load_config
 
 # !!! 예시(PLACEHOLDER) 단가 !!!  USD per 1M tokens.  실제 가격이 아닐 수 있습니다.
@@ -419,16 +421,16 @@ def mark_notified(level: str, today: _dt.date, home: Optional[str] = None) -> No
 
 
 def send_ntfy(url: str, title: str, body: str, priority: str = "default", timeout: float = 5.0) -> bool:
-    """ntfy 로 POST. 실패해도 예외를 던지지 않는다. (HTTP 헤더는 ASCII 만 쓴다)"""
+    """ntfy 토픽 URL 로 보낸다(jjkit notify, 헤더 모드). 실패해도 예외를 던지지 않는다."""
     try:
-        import urllib.request
-
-        req = urllib.request.Request(url, data=body.encode("utf-8"), method="POST")
-        req.add_header("Title", title)  # ASCII
-        req.add_header("Priority", priority)
-        req.add_header("Tags", "money_with_wings")
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 - 사용자가 설정한 URL
-            return 200 <= resp.status < 300
+        parts = urlsplit(url)
+        if parts.scheme not in ("http", "https") or not parts.netloc:
+            return False
+        server_path, _, topic = parts.path.rstrip("/").rpartition("/")
+        status = notify.ntfy(topic, body, title=title, priority=priority, tags=["money_with_wings"],
+                             server="%s://%s%s" % (parts.scheme, parts.netloc, server_path),
+                             mode="headers", timeout=timeout)
+        return 200 <= status < 300
     except Exception:
         return False
 

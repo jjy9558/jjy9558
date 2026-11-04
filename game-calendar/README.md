@@ -59,6 +59,32 @@ ntfy 전송에 실패하면 다음 실행에서 재시도합니다.
 
 점검/서비스 종료 일정에는 1일 전 알림(VALARM)이 들어 있습니다. UID는 공지 gid 기반이라 갱신해도 중복되지 않습니다.
 
+## JSON 출력(다른 도구 연동용)
+
+`python3 -m gamecal alerts --json [--days N]` 은 네트워크를 쓰지 않고 `state.json`만 읽어 예정 일정을 stdout에 JSON으로 출력합니다.
+(`--config`로 설정 파일 지정 가능, 상태 파일이 없으면 빈 목록을 출력하며 아무 파일도 만들지 않습니다.)
+
+- 점검/이벤트/패치: 오늘(KST)부터 N일 이내 시작하는 항목 (기본 14일, `--days`로 변경)
+- 진행 중 항목(`ongoing: true`): 시작일이 오늘보다 앞이지만 아직 끝나지 않았고 종료일이 N일 이내인 항목도 포함합니다.
+  "아직 끝나지 않음"은 배타적 `end`가 오늘 00:00(KST)보다 뒤라는 뜻이므로, 어제 끝난 항목은 제외되고 오늘이 마지막 날인 항목은 포함됩니다.
+- 서비스 종료: 오늘부터 60일 이내 (고정). 날짜가 확인되지 않은 공지는 제외하며 진행 중 규칙은 적용하지 않음
+- 정렬: `start` 오름차순
+- 시각은 `+09:00` ISO8601, 종일 일정은 해당 날짜 `00:00:00+09:00`이며 `end`는 배타적(다음 날 00:00)입니다.
+- `d_day`: `generated_for` 기준 시작일까지의 일수 (0 = 당일, 진행 중 항목은 음수)
+- `ends_in_days`: `end` 날짜에서 `generated_for`를 뺀 일수 (종일 일정은 배타적 종료 기준, `end`가 없으면 null)
+- `ongoing`: 시작일이 `generated_for`보다 앞이면 true
+
+```json
+{"version": 1, "generated_for": "2026-11-04", "items": [
+  {"kind": "shutdown", "game": "Dota 2", "appid": 570, "title": "Server Shutdown", "start": "2026-11-20T00:00:00+09:00",
+   "end": "2026-11-21T00:00:00+09:00", "all_day": true, "d_day": 16, "ends_in_days": 17, "ongoing": false,
+   "url": "https://store.steampowered.com/news/app/570/view/1"}
+]}
+```
+
+스키마 버전은 `version`(현재 1)이며, 검증 함수는 `gamecal/contract.py`의 `validate(obj)`입니다 (위반 시 `ValueError`).
+`kind`는 `maintenance`, `event`, `shutdown`, `patch` 중 하나입니다.
+
 ## 작업 스케줄러 예시 (Windows)
 
 ```

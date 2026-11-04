@@ -16,6 +16,15 @@
       }
     },
     "claude.task": {"enabled": false, "command": ["claude", "-p", "{prompt}", "--output-format", "text"],
-                    "repos": {"default": "C:/work/myrepo"}, "timeout": 1800}
+                    "repos": {"default": "C:/work/myrepo"}, "timeout": 1800},
+    "hpatch.translate": {"enabled": false, "command": ["python", "-m", "hpatch"], "cwd": "C:/work/hangul-patcher",
+                         "endpoint": "http://127.0.0.1:8080/v1", "default_limit": 200,
+                         "games": {
+                           "elden": {"path": "D:/Games/EldenIndie", "allow_apply": false},
+                           "hades": {"path": "D:/Games/Hades", "allow_apply": true, "font": "C:/Fonts/NanumGothic.ttf"}
+                         }},
+    "wiki.ask": {"enabled": false, "index_db": "C:/Users/me/JarvisNotes/.wiki.sqlite", "top_k": 5,
+                 "sources": {"elden": "C:/Users/me/JarvisNotes/elden", "hades": "C:/Users/me/JarvisNotes/hades"},
+                 "llm": {"base_url": "http://127.0.0.1:8080/v1", "model": "local"}}
   }
 }

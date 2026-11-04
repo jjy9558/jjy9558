@@ -61,12 +61,45 @@ _REJECT = re.compile(r"(?:거절|반려|취소|캔슬|그만둬|하지마)(?:해
 _RUN_VERB = re.compile(r"(?:실행|돌려|시작|해줘|해라|해$|켜줘|시켜)")
 
 
+_HPATCH = re.compile(r"한글패치|한글화|한패치")
+_HPATCH_VERB = re.compile(r"돌려|이어|계속|시작|실행|번역|적용|해줘|해라|해$|시켜|진행")
+_WIKI = re.compile(r"위키|wiki", re.I)
+_WIKI_TAIL = re.compile(
+    r"\s*(?:좀\s*)?(?:내?\s*)?(?:위키|wiki)(?:에서|에|를|서|좀)?\s*(?:좀\s*)?"
+    r"(?:찾아\s*(?:봐\s*줘|봐줘|봐|줘)?|검색\s*(?:해\s*(?:봐|줘)?)?|알아\s*봐\s*줘|알려\s*줘|물어\s*봐\s*줘?|봐\s*줘)?\s*[.!?~]*\s*$", re.I)
+_WIKI_HEAD = re.compile(r"^\s*(?:내?\s*)?(?:위키|wiki)(?:에서|에|를|서)?\s*", re.I)
+_WIKI_VERB_TAIL = re.compile(r"\s*(?:좀\s*)?(?:찾아\s*(?:봐\s*줘|봐줘|봐|줘)?|검색\s*(?:해\s*(?:봐|줘)?)?|알려\s*줘)\s*[.!?~]*\s*$")
+
+
+def _game_names(games):
+    """{"key": ["별칭", ...]} 또는 {"key": {"names": [...]}} -> [(key, [names])]"""
+    out = []
+    for key, v in (games or {}).items():
+        names = v.get("names", []) if isinstance(v, dict) else (v if isinstance(v, (list, tuple)) else [])
+        out.append((key, [key] + [n for n in names if isinstance(n, str) and n.strip()]))
+    return out
+
+
+def match_game(rest, games):
+    """문장 속 게임 별칭 -> (key, 별칭 부분을 뺀 나머지 문장). 못 찾으면 (None, rest)."""
+    best = None
+    for key, names in _game_names(games):
+        for n in names:
+            m = re.search(re.escape(n.strip()), rest, re.I)
+            if m and (best is None or len(n) > best[0]):
+                best = (len(n), key, m)
+    if not best:
+        return None, rest
+    m = best[2]
+    return best[1], (rest[:m.start()] + " " + rest[m.end():]).strip()
+
+
 def _find(regex, c):
     m = regex.search(c)
     return m.start() if m else None
 
 
-def parse(text, wake_words=DEFAULT_WAKE_WORDS, aliases=None):
+def parse(text, wake_words=DEFAULT_WAKE_WORDS, aliases=None, games=None):
     wake, rest = strip_wake(text, wake_words)
     c = compact(rest)
     if not c:
@@ -76,6 +109,17 @@ def parse(text, wake_words=DEFAULT_WAKE_WORDS, aliases=None):
     if _CLAUDE_HEAD.match(rest) and (re.search(r"(시켜|부탁|맡겨|라고|한테|에게)", rest) or len(c) > 12):
         prompt = _CLAUDE_TAIL.sub("", _CLAUDE_HEAD.sub("", rest, count=1)).strip(" ,.")
         return Parsed(wake, rest, [Intent("claude", {"prompt": prompt})])
+    if _HPATCH.search(c) and _HPATCH_VERB.search(c):
+        key, left = match_game(rest, games)
+        return Parsed(wake, rest, [Intent("hpatch", {"game": key, "apply": "적용" in c,
+                                                     "game_text": _HPATCH.sub("", left).strip(" ,.")})])
+    if _WIKI.search(c) and not _CLAUDE_HEAD.match(rest):
+        key, left = match_game(rest, games)
+        q = _WIKI_TAIL.sub("", left)
+        if q == left:  # '위키에서 ~ 찾아줘' 꼴
+            q = _WIKI_VERB_TAIL.sub("", _WIKI_HEAD.sub("", left, count=1))
+        q = _WIKI_HEAD.sub("", q, count=1).strip(" ,.")
+        return Parsed(wake, rest, [Intent("wiki", {"game": key, "question": q})])
     m = _ASK.match(rest)
     if m:
         return Parsed(wake, rest, [Intent("ask", {"question": m.group(1).strip(" ,.")})])

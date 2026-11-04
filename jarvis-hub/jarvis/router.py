@@ -10,7 +10,7 @@ from .intents import parse
 
 UNKNOWN = "잘 못 알아들었어요. 예: '작업 상태 알려줘', '오늘 일정', '컴퓨터 켜', '이 PDF 요약해줘'."
 HELP = ("할 수 있는 것: 작업 상태, 기기 상태, 오늘 일정, 컴퓨터 켜기, 문서 요약, "
-        "로컬 모델에게 질문, 클로드에게 작업 시키기(승인 필요), 'N번 승인/취소'.")
+        "한글패치 이어서 돌리기(승인 필요), 위키에서 찾기, 로컬 모델에게 질문, 클로드에게 작업 시키기(승인 필요), 'N번 승인/취소'.")
 
 
 class Router:
@@ -25,7 +25,8 @@ class Router:
     def handle(self, device_id, text, direct=False, file=None):
         text = str(text)[:500]
         self.hub.seen(device_id)  # 말한 기기는 살아 있다
-        p = parse(text, self.rc["wake_words"], self.rc["shell_aliases"])
+        p = parse(text, self.rc["wake_words"], self.rc["shell_aliases"],
+                  self.rc.get("games"))
         if self.rc["require_wake_word"] and not p.wake and not direct:
             return {"ok": True, "ignored": True, "reason": "호출어(자비스) 없음", "answer": "", "intents": [],
                     "jobs": []}
@@ -146,6 +147,36 @@ class Router:
             parts.append("클로드 작업 %d번 만들었어요. '자비스, %d번 승인'이라고 하면 시작해요." % (job["id"], job["id"]))
         else:
             parts.append("클로드 작업 %d번 시작할게요.%s" % (job["id"], self._offline_note(self.rc["claude_caps"], "claude.task")))
+
+    def i_hpatch(self, did, a, parts, jobs):
+        key = a.get("game")
+        if not key:
+            known = ", ".join(sorted(self.rc.get("games") or {})) or "없음"
+            parts.append("어느 게임인지 모르겠어요. (등록된 게임: %s)" % known)
+            return
+        caps = self.rc["hpatch_caps"]
+        payload = {"game": key, "limit": int(self.rc.get("hpatch_limit") or 200)}
+        if a.get("apply"):
+            payload["apply"] = True
+        job = self._submit(did, {"type": "hpatch.translate", "caps": caps, "title": "한글패치 %s" % key,
+                                 "payload": payload, "max_attempts": 10}, jobs)
+        if job["status"] == "waiting_approval":
+            parts.append("%s 한글패치 작업 %d번 만들었어요. '자비스, %d번 승인'이라고 하면 시작해요."
+                         % (key, job["id"], job["id"]))
+        else:
+            parts.append("%s 한글패치 작업 %d번 시작할게요.%s" % (key, job["id"], self._offline_note(caps, "hpatch.translate")))
+
+    def i_wiki(self, did, a, parts, jobs):
+        q = (a.get("question") or "").strip()
+        if not q:
+            parts.append("위키에서 무엇을 찾을까요?")
+            return
+        caps = self.rc["wiki_caps"]
+        payload = {"question": q}
+        if a.get("game"):
+            payload["game"] = a["game"]
+        job = self._submit(did, {"type": "wiki.ask", "caps": caps, "title": "위키 질문", "payload": payload}, jobs)
+        parts.append("위키에서 찾아볼게요. 작업 %d번.%s" % (job["id"], self._offline_note(caps, "wiki.ask")))
 
     def i_run(self, did, a, parts, jobs):
         spec = a.get("spec") or {}

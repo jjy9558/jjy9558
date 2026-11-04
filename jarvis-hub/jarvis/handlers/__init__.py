@@ -1,10 +1,12 @@
 """작업 타입 -> 핸들러. 워커 설정에서 켜진 것만 등록된다 (등록 안 된 타입은 빌려오지도 않음)."""
 from .base import Handler, HandlerError, PermanentError, default_runner  # noqa: F401
 from .claude import ClaudeTaskHandler
+from .hpatch import HpatchTranslateHandler
 from .llm import LlmChatHandler
 from .notify import NotifySayHandler
 from .shell import ShellAllowedHandler
 from .wake import WakeHandler
+from .wiki import WikiAskHandler
 
 
 def build_handlers(worker_cfg, runner=default_runner, opener=None, sock_factory=None):
@@ -25,4 +27,10 @@ def build_handlers(worker_cfg, runner=default_runner, opener=None, sock_factory=
     wk = h.get("wake") or {}
     if wk.get("enabled"):
         out["wake"] = WakeHandler(wk, sock_factory=sock_factory)
+    hp = h.get("hpatch.translate") or {}
+    if hp.get("enabled") is True:
+        out["hpatch.translate"] = HpatchTranslateHandler(hp, runner=runner)
+    wi = h.get("wiki.ask") or {}
+    if wi.get("enabled") is True:
+        out["wiki.ask"] = WikiAskHandler(wi, opener=opener)
     return out

@@ -83,7 +83,7 @@ python -m jarvis hub --config hub.json
 | `devices.<id>.submit` | 넣을 수 있는 작업 타입(glob). 기본 `["*"]` |
 | `devices.<id>.approve` | 승인/거절 권한 (폰에 주면 "자비스, 3번 승인"이 됨) |
 | `devices.<id>.trusted` | `true`면 이 기기가 넣은 작업은 승인 없이 바로 큐로 |
-| `approval.required_types` | 신뢰 기기가 아닌 곳에서 넣으면 승인 대기로 가는 타입. 기본 `["claude.task"]` |
+| `approval.required_types` | 신뢰 기기가 아닌 곳에서 넣으면 승인 대기로 가는 타입. 기본 `["claude.task", "hpatch.translate"]` |
 | `wake.*` | 메인PC MAC, 브로드캐스트 주소(예 `192.168.0.255`), `for_caps`(기본 `gpu`), 쿨다운 |
 | `notify.say_events` / `say_job` | 완료 시 이벤트 스트림에 `say` / `notify.say` 작업 생성 |
 | `notify.ntfy` | `enabled`, `server`, `topic`(추측 어려운 이름), `token` |
@@ -119,6 +119,8 @@ python -m jarvis worker --config worker.json --caps gpu,llm,windows,claude
 | `claude.task` | `enabled: true` (기본 **꺼짐**) | `command` 템플릿(`["claude","-p","{prompt}"]`)을 `repos`에 등록한 폴더에서 실행. 프롬프트는 인자 하나로 |
 | `notify.say` | `enabled: true` | s21-sidekick에 말하기 요청 |
 | `wake` | `enabled: true` | WOL 매직 패킷 (UDP 브로드캐스트, 102바이트 = FF×6 + MAC×16) |
+| `hpatch.translate` | `enabled: true` (기본 **꺼짐**) | 한글패치 대기열 (아래 6-1절). 등록한 게임 폴더만 |
+| `wiki.ask` | `enabled: true` (기본 꺼짐) | 로컬 위키 Q&A (아래 6-2절). 웹 접속 없음 |
 
 > Windows 주의: `claude`가 `claude.cmd`로 잡히면 cmd.exe가 인자를 다시 해석합니다(BatBadBut).
 > 그래서 실행 파일이 `.cmd/.bat`이거나 Windows에서 확장자 없이 쓴 경우 `" % ! ^ & | < > ( )` 등을 지웁니다.
@@ -239,12 +241,49 @@ def r_say(self, q):
 하트비트로 연장되지 않으면 다시 queued (시도 횟수 소진 시 failed). 일시적 오류는 `retry_delay_seconds` 후 재시도,
 잘못된 요청(허용 안 된 명령 등)은 즉시 failed.
 
+### 6-1. 한글패치 대기열 `hpatch.translate`
+
+[hangul-patcher](../hangul-patcher)(`python -m hpatch`)를 5080 워커에서 돌립니다. caps `gpu`+`llm`, 허브 기본값은 **승인 필요**
+(`approval.required_types`). 게임은 워커 설정의 **허용 목록 키**로만 고릅니다. payload에 경로를 쓰면 거부됩니다.
+
+```json
+"hpatch.translate": {"enabled": true, "command": ["python", "-m", "hpatch"], "cwd": "C:/work/hangul-patcher",
+  "endpoint": "http://127.0.0.1:8080/v1", "default_limit": 200,
+  "games": {"elden": {"path": "D:/Games/EldenIndie", "allow_apply": false},
+            "hades": {"path": "D:/Games/Hades", "allow_apply": true, "font": "C:/Fonts/NanumGothic.ttf"}}}
+```
+
+- payload: `{"game": "elden", "limit": 200, "apply": false}` (그 밖의 필드는 거부)
+- 단계: `scan` → `extract` → `translate --limit N` → (`apply`는 payload가 `apply: true` **그리고** 그 게임에 `allow_apply: true`일 때만. 아니면 실행 전에 거부)
+- `translate`는 이어서 하기가 됩니다. 종료 코드 **3(LLM 서버 연결 불가)** 이나 시간 초과는 *재시도 가능* 실패라 허브가 다시 큐에 넣고(진행은 저장됨), 다른 오류는 재시도하지 않습니다.
+- 각 단계의 출력 줄은 작업 결과의 `steps[].lines` / `progress`에 담깁니다 (단계가 끝난 뒤 한꺼번에).
+- 말로: "자비스, 엘든 한글패치 이어서 돌려" → 작업 생성 + "N번 승인" 안내. `hub.json`의 `router.games`에 별칭을 등록하세요
+  (`{"elden": ["엘든", "엘든링"]}`, 키는 워커 설정의 게임 키와 같아야 함). "적용"이 들어가면 `apply: true`로 요청하지만 `allow_apply`가 없으면 워커가 거부합니다.
+
+### 6-2. 로컬 위키 Q&A `wiki.ask`
+
+직접 저장해 둔 공략 노트(md/txt/html) 폴더를 sqlite로 색인해 질문에 답합니다. **웹을 가져오지 않습니다** (노트는 사용자가 저장한 것만).
+
+```json
+"wiki.ask": {"enabled": true, "index_db": "C:/Users/me/JarvisNotes/.wiki.sqlite", "top_k": 5,
+  "sources": {"elden": "C:/Users/me/JarvisNotes/elden"},
+  "llm": {"base_url": "http://127.0.0.1:8080/v1", "model": "local"}}
+```
+
+- payload: `{"question": "보스 약점", "game": "elden"}` (`game` 생략 = 모든 폴더, 경로 거부)
+- 색인: 작업이 올 때마다 바뀐 파일만 증분 갱신. 한글은 2-gram이라 조사가 붙어도 찾습니다. FTS5(bm25)가 없으면 자동으로 2-gram postings 색인(tf-idf)으로 대체.
+- 답: 상위 문단 + 파일 이름 인용. `llm.base_url`이 있으면 문단만 근거로 요약하고 `[파일이름]`을 인용하게 하며(빠지면 `출처:` 줄을 덧붙임),
+  LLM이 꺼져 있거나 실패하면 문단을 그대로 돌려줍니다. LLM 주소는 로컬/사설망/tailnet만 허용합니다.
+- 말로: "자비스, 엘든 보스 약점 위키에서 찾아줘". 승인 불필요, caps는 `router.wiki_caps`(기본 없음 = 핸들러가 켜진 아무 워커).
+
 ## 7. 보안
 
 - 기기별 토큰, 등록 안 된 기기 id 거부, 상수 시간 비교. 다른 기기 토큰으로 사칭 불가.
 - 기기별 권한: 워커 여부, 주장 가능한 caps, 넣을 수 있는 타입, 승인 권한, 신뢰 여부.
 - **임의 명령 실행 경로 없음**: `shell.allowed`는 설정에 이름 붙인 argv만, `claude.task`는 고정 템플릿 + 등록된 폴더만.
   `shell=True`/`os.system`/`eval` 없음 (`tests/test_safety.py`가 소스 전체를 검사).
+- `hpatch.translate`는 설정의 게임 키 허용 목록만(경로 payload 거부), apply는 payload + `allow_apply` 둘 다 필요, 기본 승인 필요.
+  `wiki.ask`는 설정한 노트 폴더만 읽고(폴더 밖 심볼릭 링크 무시) 웹에 접속하지 않음.
 - `llm.chat`의 파일은 `files_dir` 안의 파일 이름만 (경로·`..` 거부).
 - 크기 제한: 요청 256KB, payload 64KB, result 256KB, 활성 작업 500개, 발화 500자.
 - `claude.task`는 기본 꺼짐 + 폰에서 넣으면 승인 필요. 음성 승인은 `approve` 권한이 있는 기기만.
@@ -259,7 +298,7 @@ cd jarvis-hub && python3 -m unittest discover -s tests -v
 
 큐(임대/caps 매칭/우선순위/만료·재시도/연장), 하트비트 온·오프라인, WOL 패킷 바이트(실제 UDP 루프백 포함),
 한국어 의도 파싱(40여 개 표현), 상태 기반 대답, 핸들러 안전성(허용 안 된 이름 거부, 인자 검증, 셸 없음),
-claude.task 기본 꺼짐·인자 하나 전달, 허브+워커 스레드를 localhost 포트 0에 띄운 HTTP 종단 간 테스트.
+claude.task 기본 꺼짐·인자 하나 전달, hpatch(키 허용 목록·단계 순서·종료 코드 3 재시도·apply 게이트), 위키(색인·순위·LLM 폴백·인용), 허브+워커 스레드를 localhost 포트 0에 띄운 HTTP 종단 간 테스트.
 
 ## 9. 로드맵
 
@@ -288,7 +327,8 @@ jarvis/
   wol.py         매직 패킷
   notifier.py    ntfy
   schedule.py    오늘 일정 (JSON / ICS)
-  handlers/      llm.chat, shell.allowed, claude.task, notify.say, wake
+  handlers/      llm.chat, shell.allowed, claude.task, notify.say, wake, hpatch.translate, wiki.ask
+  wikiindex.py   위키 색인 (FTS5 / 2-gram 대체)
   static/dashboard.html
 hub.example.json  worker.main.example.json  worker.minipc.example.json  client.example.json  schedule.example.json
 ```

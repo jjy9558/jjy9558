@@ -6,6 +6,7 @@ import re
 
 DEVICE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 TAG_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,31}$")
+GAME_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 TYPE_RE = re.compile(r"^[a-z][a-z0-9_-]*(\.[a-z0-9_-]+)*$")
 RESERVED_DEVICES = ("hub",)
 MIN_TOKEN_LEN = 16
@@ -37,7 +38,7 @@ HUB_DEFAULTS = {
     "wake": {"enabled": False, "label": "5080", "mac": "", "broadcast": "255.255.255.255", "port": 9,
              "for_caps": ["gpu"], "cooldown_seconds": 300},
     # 이 타입은 '신뢰(trusted)' 기기가 아닌 곳에서 넣으면 승인 대기로 들어간다.
-    "approval": {"required_types": ["claude.task"]},
+    "approval": {"required_types": ["claude.task", "hpatch.translate"]},
     "notify": {
         "say_events": True,   # 허브 이벤트 스트림에 kind=say 이벤트 (대시보드/폰이 읽어줌)
         "say_job": True,      # notify.say 작업을 넣어 s21-sidekick으로 전달
@@ -53,6 +54,12 @@ HUB_DEFAULTS = {
         "llm_caps": ["gpu"],
         "claude_caps": [],
         "claude_repo": "",
+        "hpatch_caps": ["gpu", "llm"],
+        "wiki_caps": [],
+        # 게임 별칭 (한글패치/위키 의도용): {"엘든링": ["엘든", "elden"]} 또는 {"elden": {"names": ["엘든"]}}
+        # 키는 워커 설정(handlers.hpatch.translate.games / handlers.wiki.ask.sources)의 키와 같아야 한다.
+        "games": {},
+        "hpatch_limit": 200,
         # "백업": {"name": "backup", "args": {}}  ->  "자비스, 백업 실행해"
         "shell_aliases": {},
     },
@@ -81,6 +88,17 @@ WORKER_DEFAULTS = {
         "notify.say": {"enabled": False, "sidekick_url": "", "token": "", "path": "/api/say",
                        "timeout": 5},
         "wake": {"enabled": False, "repeat": 3},
+        # 한글패치 대기열. games 는 '게임 키 -> 폴더' 허용 목록 (payload 는 키만 말할 수 있다).
+        # "games": {"elden": {"path": "D:/Games/Elden", "allow_apply": false, "font": "", "engine": "auto"}}
+        "hpatch.translate": {"enabled": False, "command": ["python", "-m", "hpatch"], "cwd": "",
+                             "games": {}, "default_limit": 200, "max_limit": 5000,
+                             "scan_timeout": 300, "translate_timeout": 7200, "apply_timeout": 600,
+                             "endpoint": "", "model": "", "max_progress_lines": 40},
+        # 로컬 위키 Q&A. sources 는 '게임 키 -> 노트 폴더' (사용자가 직접 저장한 md/txt/html). 웹 접속 없음.
+        "wiki.ask": {"enabled": False, "sources": {}, "index_db": "", "top_k": 5, "max_passage_chars": 700,
+                     "force_fallback_index": False,
+                     "llm": {"base_url": "", "model": "local", "api_key": "", "timeout": 120,
+                             "max_tokens": 700}},
     },
 }
 
@@ -151,6 +169,8 @@ def build_hub_config(raw):
         cfg["wake"]["for_caps"] = check_tags(cfg["wake"]["for_caps"], "wake.for_caps")
         cfg["router"]["llm_caps"] = check_tags(cfg["router"]["llm_caps"], "router.llm_caps")
         cfg["router"]["claude_caps"] = check_tags(cfg["router"]["claude_caps"], "router.claude_caps")
+        cfg["router"]["hpatch_caps"] = check_tags(cfg["router"]["hpatch_caps"], "router.hpatch_caps")
+        cfg["router"]["wiki_caps"] = check_tags(cfg["router"]["wiki_caps"], "router.wiki_caps")
         cfg["notify"]["say_caps"] = check_tags(cfg["notify"]["say_caps"], "notify.say_caps")
     except ConfigError as e:
         errors.append(str(e))
@@ -190,6 +210,23 @@ def build_worker_config(raw, overrides=None):
         errors.append("handlers.claude.task.command: 문자열 목록이어야 합니다")
     elif cfg["handlers"]["claude.task"]["enabled"] and "{prompt}" not in cmd:
         errors.append("handlers.claude.task.command: '{prompt}' 를 독립된 항목으로 넣으세요")
+    hp = cfg["handlers"]["hpatch.translate"]
+    if hp.get("enabled"):
+        cmd = hp.get("command")
+        if not isinstance(cmd, list) or not cmd or not all(isinstance(a, str) for a in cmd):
+            errors.append("handlers.hpatch.translate.command: 문자열 목록이어야 합니다")
+        for key, g in (hp.get("games") or {}).items():
+            if not GAME_KEY_RE.match(str(key)):
+                errors.append("handlers.hpatch.translate.games.%s: 키는 소문자/숫자/_- 32자 이내" % key)
+            elif not isinstance(g, dict) or not isinstance(g.get("path"), str) or not g["path"]:
+                errors.append("handlers.hpatch.translate.games.%s.path 가 필요합니다" % key)
+    wk = cfg["handlers"]["wiki.ask"]
+    if wk.get("enabled"):
+        for key, folder in (wk.get("sources") or {}).items():
+            if not GAME_KEY_RE.match(str(key)):
+                errors.append("handlers.wiki.ask.sources.%s: 키는 소문자/숫자/_- 32자 이내" % key)
+            elif not isinstance(folder, str) or not folder:
+                errors.append("handlers.wiki.ask.sources.%s: 폴더 경로가 필요합니다" % key)
     if errors:
         raise ConfigError("\n".join(errors))
     return cfg

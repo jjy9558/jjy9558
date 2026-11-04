@@ -7,11 +7,11 @@
     "main":   {"token": "CHANGE-ME-main-token-xxxxxxxxxx", "label": "5080", "worker": true,
                "caps": ["gpu", "llm", "stt", "windows", "claude"], "submit": ["*"], "trusted": true},
     "s21":    {"token": "CHANGE-ME-s21-token-xxxxxxxxxxx", "label": "S21", "worker": false,
-               "submit": ["llm.chat", "claude.task", "shell.allowed", "notify.say"], "approve": true}
+               "submit": ["llm.chat", "claude.task", "hpatch.translate", "wiki.ask", "shell.allowed", "notify.say"], "approve": true}
   },
   "wake": {"enabled": true, "label": "5080", "mac": "AA:BB:CC:DD:EE:FF", "broadcast": "192.168.0.255",
            "port": 9, "for_caps": ["gpu"], "cooldown_seconds": 300},
-  "approval": {"required_types": ["claude.task"]},
+  "approval": {"required_types": ["claude.task", "hpatch.translate"]},
   "notify": {
     "say_events": true,
     "say_job": true,
@@ -23,6 +23,10 @@
     "llm_fallback": false,
     "llm_caps": ["gpu"],
     "claude_repo": "default",
+    "hpatch_caps": ["gpu", "llm"],
+    "hpatch_limit": 200,
+    "wiki_caps": [],
+    "games": {"elden": ["엘든", "엘든링"], "hades": ["하데스"]},
     "shell_aliases": {
       "백업": {"name": "backup"},
       "깃 상태": {"name": "git_status"}

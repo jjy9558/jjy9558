@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
+from . import contract
 from . import ics as icsmod
 from .acquire import AcquireError, SUPPORTED_EXT, acquire_text
 from .advice import ACTION, DISCARD, KEEP, REFUND_DISCLAIMER, advise
@@ -365,6 +366,54 @@ class Butler:
         docs = self.db.docs_due_between(start, end)
         refunds = self.db.refunds_between(today.isoformat(), end)
         return {"docs": list(docs), "refunds": list(refunds)}
+
+    # -- 기계용 JSON (contract.py 스키마 v1) -------------------------------------
+    def due_payload(self, days: int = 14, overdue_days: int = DEFAULT_OVERDUE_DAYS) -> Dict[str, Any]:
+        """due 명령과 같은 기간의 항목(문서 + 환불)을 due 순으로 돌려준다."""
+        today = self.today
+        start = (today - dt.timedelta(days=overdue_days)).isoformat()
+        end = (today + dt.timedelta(days=days)).isoformat()
+        items = [self._bill_item(r) for r in self.db.docs_due_between(start, end)]
+        items += [self._refund_item(r) for r in self.db.refunds_between(today.isoformat(), end)]
+        return self._payload(items)
+
+    def refunds_payload(self, days: int = 30) -> Dict[str, Any]:
+        """refunds 명령과 같은 기간(오늘부터 N일 이내)의 환불·반품 기한만 돌려준다."""
+        today = self.today
+        end = (today + dt.timedelta(days=days)).isoformat()
+        return self._payload([self._refund_item(r) for r in self.db.refunds_between(today.isoformat(), end)])
+
+    def _payload(self, items: List[Dict[str, Any]]) -> Dict[str, Any]:
+        obj = {"version": contract.SCHEMA_VERSION, "generated_for": self.today.isoformat(),
+               "items": sorted(items, key=contract.sort_key)}
+        return contract.validate(obj)
+
+    def _bill_item(self, r: Any) -> Dict[str, Any]:
+        due = dt.date.fromisoformat(r["due_date"])
+        label = SUBTYPE_LABEL.get(r["subtype"], r["subtype"] or DOC_TYPES.get(r["doc_type"], "서류"))
+        return {
+            "kind": contract.KIND_BILL,
+            "title": mask_text(label),
+            "merchant": mask_text(r["issuer"] or r["merchant"] or ""),
+            "amount": int(r["amount"]) if r["amount"] is not None else None,
+            "due": due.isoformat(),
+            "days_left": (due - self.today).days,
+            "auto_debit": bool(r["auto_debit"]),
+            "doc_id": int(r["id"]),
+        }
+
+    def _refund_item(self, r: Any) -> Dict[str, Any]:
+        deadline = dt.date.fromisoformat(r["deadline"])
+        return {
+            "kind": contract.KIND_REFUND,
+            "title": "환불·반품 기한",
+            "merchant": mask_text(r["merchant"] or ""),
+            "amount": int(r["amount"]) if r["amount"] is not None else None,
+            "due": deadline.isoformat(),
+            "days_left": (deadline - self.today).days,
+            "auto_debit": False,
+            "doc_id": int(r["doc_id"]),
+        }
 
     def ledger(self, month: str) -> Dict[str, Any]:
         rows = self.db.payments_for_month(month)

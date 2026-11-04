@@ -51,15 +51,57 @@ $ python3 -m paperbutler add -
 |---|---|
 | `add <file\|-> [--type auto]` | 파일 또는 표준입력(`-`) 추가. `--type`: auto, bill(고지서), card(결제문자), receipt(영수증), notice(안내문), parcel(택배), ad(광고). `--no-llm` 으로 LLM 보완 끄기 |
 | `add <file\|-> --redact-only [-o 출력]` | **저장하지 않고** 마스킹된 텍스트 사본만 만듭니다 |
-| `due [--days 14]` | 납부기한·환불기한 임박 목록 (지난 기한도 30일 전까지 표시) |
+| `due [--days 14] [--json]` | 납부기한·환불기한 임박 목록 (지난 기한도 30일 전까지 표시). `--json` 은 기계용 출력 |
 | `ledger --month 2026-11 [--no-detail]` | 월별 카테고리 합계와 내역 |
 | `export-csv [--month M] [--what ledger\|docs] [-o 파일]` | CSV 내보내기 (UTF-8 BOM, 엑셀에서 바로 열림) |
 | `ics [-o 파일] [--days N] [--no-refunds] [--include-done]` | 납부기한 캘린더 `.ics` 만들기 |
 | `find "가스"` | 저장한 서류 검색 (본문·기관·가맹점·요약, 여러 단어는 AND) |
 | `inbox <폴더> [--recursive] [--min-age 3]` | 폴더의 **새 파일만** 처리 (여러 번 실행해도 안전) |
 | `show <id>` / `done <id> [--undo]` | 상세 보기 / 납부(처리) 완료 표시 |
-| `refunds [--days 30]` | 환불·반품 기한 목록 |
+| `refunds [--days 30] [--json]` | 환불·반품 기한 목록 (`--json`: 기계용 출력) |
 | `doctor` | pdftotext / tesseract / LLM 사용 가능 여부 점검 |
+
+## JSON 출력(다른 도구 연동용)
+
+`due --json` 과 `refunds --json` 은 다른 프로그램이 읽기 쉬운 JSON 을 **표준출력에만** 씁니다(로그·안내는 표준오류). 텍스트 출력은 그대로입니다.
+
+```bash
+python3 -m paperbutler due --days 30 --json          # 납부기한 + 환불기한, 기한 순
+python3 -m paperbutler refunds --days 14 --json      # 환불·반품 기한만
+```
+
+```json
+{
+  "version": 1,
+  "generated_for": "2026-11-04",
+  "items": [
+    {"kind": "refund", "title": "환불·반품 기한", "merchant": "쿠팡", "amount": 29900,
+     "due": "2026-11-09", "days_left": 5, "auto_debit": false, "doc_id": 2},
+    {"kind": "bill", "title": "가스요금", "merchant": "서울도시가스", "amount": 38900,
+     "due": "2026-11-20", "days_left": 16, "auto_debit": false, "doc_id": 1}
+  ]
+}
+```
+
+| 필드 | 타입 | 의미 |
+|---|---|---|
+| `version` | 정수 | 스키마 버전. 현재 `1` (`paperbutler/contract.py` 의 `SCHEMA_VERSION`) |
+| `generated_for` | `"YYYY-MM-DD"` | 기준일 (`--today` 가 있으면 그 날짜) |
+| `items[].kind` | `"bill"` \| `"refund"` | `bill`: 납부기한이 있는 문서(고지서·안내문 등), `refund`: 환불·반품 기한 |
+| `items[].title` | 문자열 | 문서 종류 이름(예: `가스요금`) 또는 `환불·반품 기한` |
+| `items[].merchant` | 문자열 | 기관명(고지서) 또는 가맹점(영수증). 없으면 `""` |
+| `items[].amount` | 정수 \| `null` | 금액(원). 모르면 `null` |
+| `items[].due` | `"YYYY-MM-DD"` | 납부기한 또는 환불 기한 |
+| `items[].days_left` | 정수 | `due - generated_for` (음수면 지난 기한) |
+| `items[].auto_debit` | 불리언 | 자동이체 여부 (환불 항목은 `false`) |
+| `items[].doc_id` | 정수 | 문서 번호 (`show <id>` 로 상세 조회) |
+
+- **정렬**: `due` 오름차순. 같은 날이면 `bill` 이 먼저, 그다음 문서 번호 순입니다.
+- **기간**: `due --json` 은 `due` 명령과 같습니다(기본 14일 이내 + 지난 기한 `--overdue-days` 일 전까지, 완료 표시한 항목 제외).
+  `refunds --json` 은 `refunds` 명령과 같습니다(오늘부터 `--days` 일 이내). 항목이 없으면 `"items": []` 입니다.
+- **마스킹**: 텍스트 출력과 같은 규칙으로 마스킹합니다(전화번호·계좌·주민번호 등은 `010-****-5678` 형태). 고객번호는 항목에 넣지 않습니다.
+- **버전 정책**: 필드를 추가·삭제·이름 변경하거나 타입을 바꾸면 `version` 을 올립니다. 소비자는 `version` 이 기대한 값인지 먼저 확인하세요.
+- **검증**: `paperbutler.contract.validate(obj)` 가 위 규칙(키 집합, 타입, `days_left` 계산, 정렬)을 검사합니다. 어긋나면 `ValueError` 를 던집니다.
 
 ## S21 카메라 → 공유 폴더 → inbox 워크플로
 

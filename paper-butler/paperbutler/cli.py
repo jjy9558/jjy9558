@@ -59,6 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("due", parents=[common], help="납부기한·환불기한 임박 목록")
     p.add_argument("--days", type=int, default=14)
     p.add_argument("--overdue-days", type=int, default=30, help="지난 기한도 며칠 전까지 보여줄지")
+    p.add_argument("--json", action="store_true", help="기계용 JSON 출력 (스키마는 README 참고)")
 
     p = sub.add_parser("ledger", parents=[common], help="월별 가계부")
     p.add_argument("--month", help="YYYY-MM (기본: 이번 달)")
@@ -95,6 +96,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("refunds", parents=[common], help="환불/반품 기한 목록")
     p.add_argument("--days", type=int, default=30)
+    p.add_argument("--json", action="store_true", help="기계용 JSON 출력 (스키마는 README 참고)")
 
     sub.add_parser("doctor", parents=[common], help="사용 가능한 입력 도구(pdftotext/tesseract/LLM) 점검")
     return ap
@@ -204,7 +206,21 @@ def cmd_add(b: Butler, a: argparse.Namespace) -> int:
     return rc
 
 
+def _emit_json(obj: Any) -> None:
+    """기계용 JSON 을 stdout 에 UTF-8 로 쓴다. 마스킹은 Butler 의 *_payload 에서 이미 끝났다."""
+    data = json.dumps(obj, ensure_ascii=False, indent=2) + "\n"
+    buf = getattr(sys.stdout, "buffer", None)
+    if buf is not None:
+        buf.write(data.encode("utf-8"))
+        buf.flush()
+    else:
+        sys.stdout.write(data)
+
+
 def cmd_due(b: Butler, a: argparse.Namespace) -> int:
+    if a.json:
+        _emit_json(b.due_payload(a.days, a.overdue_days))
+        return 0
     today = b.today
     rep = b.due(a.days, a.overdue_days)
     emit("== 납부·기한 목록 (%s 기준, %d일 이내) ==" % (fmt_md(today), a.days))
@@ -335,6 +351,9 @@ def cmd_done(b: Butler, a: argparse.Namespace) -> int:
 
 
 def cmd_refunds(b: Butler, a: argparse.Namespace) -> int:
+    if a.json:
+        _emit_json(b.refunds_payload(a.days))
+        return 0
     today = b.today
     end = (today + dt.timedelta(days=a.days)).isoformat()
     rows = b.db.refunds_between(today.isoformat(), end)

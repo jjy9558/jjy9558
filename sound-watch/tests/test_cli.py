@@ -130,3 +130,17 @@ class CliTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DefaultDataDirTests(unittest.TestCase):
+    def test_default_and_legacy(self):
+        from soundwatch.cli import default_data_dir
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(default_data_dir(env={"SOUNDWATCH_HOME": "/x"}, cwd=d), "/x")
+            self.assertEqual(default_data_dir(env={}, cwd=d),
+                             os.path.join(os.path.expanduser("~"), ".soundwatch"))
+            os.makedirs(os.path.join(d, "data"))
+            open(os.path.join(d, "data", "soundwatch.db"), "w").close()
+            err = io.StringIO()
+            self.assertEqual(default_data_dir(env={}, cwd=d, err=err), os.path.join(d, "data"))
+            self.assertIn("안내", err.getvalue())

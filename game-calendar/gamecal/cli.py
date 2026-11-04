@@ -5,7 +5,7 @@ import sys
 
 from . import classify as C
 from .alerts import alerts_payload
-from .config import add_appid, load_config, load_games
+from .config import add_appid, default_config_path, load_config, load_games
 from .dates import KST, UTC
 from .models import Entry
 from .runner import run
@@ -30,7 +30,8 @@ def _write_utf8(text, stream):
 
 def main(argv=None):
     common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("--config", default="gamecal.json", help="설정 파일 (기본 gamecal.json)")
+    common.add_argument("--config", default=None,
+                        help="설정 파일 (기본 ~/.gamecal/gamecal.json, 환경변수 GAMECAL_HOME)")
     p = argparse.ArgumentParser(prog="gamecal", description="내 게임 캘린더")
     sub = p.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run", parents=[common], help="뉴스 수집/ics/다이제스트/경보")
@@ -44,6 +45,8 @@ def main(argv=None):
     a = sub.add_parser("add", parents=[common], help="appid 추가")
     a.add_argument("appid", type=int)
     args = p.parse_args(argv)
+    if not args.config:
+        args.config = default_config_path()
 
     if args.cmd == "add":
         ok = add_appid(args.config, args.appid)
@@ -60,8 +63,14 @@ def main(argv=None):
         _write_utf8(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", sys.stdout)
         return 0
     if args.cmd == "list":
-        for appid, name in sorted(load_games(cfg).items()):
+        games = load_games(cfg)
+        for appid, name in sorted(games.items()):
             print("%10d  %s" % (appid, name))
+        if not games:
+            print("추적 중인 게임이 없습니다.")
+            print("추가하려면: gamecal add <Steam appid>   (예: gamecal add 570)")
+            print("또는 %s 의 \"appids\" 에 직접 적거나, steam_buddy.enabled 를 true 로 켜세요."
+                  % (cfg.get("_path") or "gamecal.json"))
         st = load_state(cfg["state_file"])
         sd = [Entry.from_dict(d) for d in st["entries"].values()]
         sd = [e for e in sd if e.category == C.SHUTDOWN and not e.is_notice]

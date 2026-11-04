@@ -228,6 +228,26 @@ def build_parser():
     return p
 
 
+WINDOWS_ONLY_MESSAGE = ("윈도우 전용 점검입니다. 이 PC(%s)에서는 하드웨어/설정을 읽을 수 없어 "
+                        "'문제 없음'으로 판단하지 않습니다. 윈도우에서 실행하거나 "
+                        "--snapshot <파일> 로 저장된 스냅샷을 지정하세요.")
+EXIT_NOT_WINDOWS = 3
+
+
+def _needs_live_windows(a):
+    """실제 시스템(윈도우)을 읽어야 하는 명령인지."""
+    cmd = a.fn.__name__
+    if cmd in ("cmd_snapshot", "cmd_updates", "cmd_gamemode"):
+        return True
+    if cmd in ("cmd_check", "cmd_upgrade"):
+        return not getattr(a, "snapshot", None)
+    if cmd == "cmd_tweaks":
+        if a.tweaks_cmd == "list":
+            return not getattr(a, "no_status", False)
+        return a.tweaks_cmd in ("apply", "restore")
+    return False
+
+
 def main(argv=None, system=None):
     for stream in (sys.stdout, sys.stderr):
         try:
@@ -235,6 +255,9 @@ def main(argv=None, system=None):
         except (AttributeError, ValueError):
             pass
     a = build_parser().parse_args(argv)
+    if system is None and sys.platform != "win32" and _needs_live_windows(a):
+        print(WINDOWS_ONLY_MESSAGE % sys.platform, file=sys.stderr)
+        return EXIT_NOT_WINDOWS
     cfg = cfgmod.load_config()
     try:
         return a.fn(a, system or _system(), cfg)

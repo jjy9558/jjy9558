@@ -360,3 +360,25 @@ class OngoingTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ListHintAndDefaultPathTests(unittest.TestCase):
+    def test_list_empty_prints_hint(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = os.path.join(d, "gamecal.json")
+            with open(cfg, "w", encoding="utf-8") as f:
+                json.dump({"state_file": "state.json"}, f)
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                self.assertEqual(main(["list", "--config", cfg]), 0)
+            self.assertIn("gamecal add", buf.getvalue())
+
+    def test_default_config_path(self):
+        from gamecal.config import default_config_path
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(default_config_path(env={"GAMECAL_HOME": d}, cwd=d), os.path.join(d, "gamecal.json"))
+            p = default_config_path(env={}, cwd=d)
+            self.assertTrue(p.endswith(os.path.join(".gamecal", "gamecal.json")))
+            open(os.path.join(d, "gamecal.json"), "w").close()
+            if not os.path.exists(p):
+                self.assertEqual(default_config_path(env={}, cwd=d), os.path.join(d, "gamecal.json"))

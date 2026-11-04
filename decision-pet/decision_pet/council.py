@@ -17,6 +17,7 @@ import zlib
 from pathlib import Path
 
 from .decide import _chat_url
+from .storage import llm_endpoint
 from .vjournal_import import open_readonly
 
 SOURCE_KEYS = ("cool_off", "steam_buddy", "life_nagger", "voice_journal", "paper_butler")
@@ -342,7 +343,7 @@ def phrase_with_llm(result, llm_config, opener=None):
     if llm_config.get("api_key"):
         headers["Authorization"] = "Bearer " + llm_config["api_key"]
     try:
-        req = urllib.request.Request(_chat_url(llm_config.get("endpoint", "")),
+        req = urllib.request.Request(_chat_url(llm_endpoint(llm_config)),
                                      data=json.dumps(body).encode("utf-8"), headers=headers, method="POST")
         resp = opener(req, timeout=llm_config.get("timeout", 8))
         try:

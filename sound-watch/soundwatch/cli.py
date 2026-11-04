@@ -28,8 +28,25 @@ def _mmss(t: float) -> str:
     return "%d:%04.1f" % (int(t // 60), t % 60)
 
 
+_LEGACY_FILES = ("soundwatch.db", "config.json", "templates.json")
+
+
+def default_data_dir(env=None, cwd=None, err=None) -> str:
+    """SOUNDWATCH_HOME > (옛 위치 ./data 에 기록 파일이 이미 있으면 그것) > ~/.soundwatch"""
+    env = os.environ if env is None else env
+    if env.get("SOUNDWATCH_HOME"):
+        return env["SOUNDWATCH_HOME"]
+    new = os.path.join(os.path.expanduser("~"), ".soundwatch")
+    legacy = os.path.join(cwd or os.getcwd(), "data")
+    if any(os.path.isfile(os.path.join(legacy, f)) for f in _LEGACY_FILES):
+        print("안내: 현재 폴더의 옛 data/ 를 사용합니다. 사용자 폴더로 옮기려면 data/ 내용을 %s 로 이동하세요 "
+              "(또는 SOUNDWATCH_HOME 지정)." % new, file=err or sys.stderr)
+        return legacy
+    return new
+
+
 def _paths(args) -> Paths:
-    return Paths(args.data_dir or os.environ.get("SOUNDWATCH_HOME") or "data")
+    return Paths(args.data_dir or default_data_dir())
 
 
 def _parse_start(s: Optional[str], cfg) -> float:

@@ -151,3 +151,24 @@ class LedgerCliTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DefaultLedgerPathTests(unittest.TestCase):
+    def test_default_location(self):
+        import io, os, tempfile
+        from sellstudio.cli import default_ledger
+        with tempfile.TemporaryDirectory() as d, tempfile.TemporaryDirectory() as home:
+            old = os.environ.get("HOME"), os.environ.get("USERPROFILE")
+            os.environ["HOME"] = os.environ["USERPROFILE"] = home
+            try:
+                self.assertEqual(default_ledger(env={"SELLSTUDIO_LEDGER": "x.json"}, cwd=d), "x.json")
+                p = default_ledger(env={}, cwd=d)
+                self.assertEqual(p, os.path.join(home, ".sell-studio", "sell-ledger.json"))
+                open(os.path.join(d, "sell-ledger.json"), "w").close()
+                err = io.StringIO()
+                self.assertEqual(default_ledger(env={}, cwd=d, err=err), os.path.join(d, "sell-ledger.json"))
+                self.assertIn("안내", err.getvalue())
+            finally:
+                for k, v in zip(("HOME", "USERPROFILE"), old):
+                    if v is None: os.environ.pop(k, None)
+                    else: os.environ[k] = v

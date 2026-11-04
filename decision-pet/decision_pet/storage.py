@@ -4,12 +4,22 @@ import json
 import os
 from pathlib import Path
 
+DEFAULT_LLM_URL = "http://localhost:1234/v1"
+
+
+def llm_endpoint(llm_config, env=None):
+    """DECISION_PET_LLM_URL 환경변수 > 설정(config.llm.endpoint) > 기본값."""
+    env = os.environ if env is None else env
+    return (env.get("DECISION_PET_LLM_URL") or (llm_config or {}).get("endpoint")
+            or DEFAULT_LLM_URL)
+
+
 DEFAULT_CONFIG = {
     "nudge_minutes": 30,
     "max_skips": 5,
     "max_age_days": 30,
     "llm": {
-        "endpoint": "http://localhost:1234/v1",
+        "endpoint": DEFAULT_LLM_URL,
         "model": "local-model",
         "api_key": "",
         "timeout": 8,

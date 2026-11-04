@@ -54,3 +54,31 @@ class CliTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NonWindowsTests(unittest.TestCase):
+    def _run_real(self, argv, platform):
+        from unittest import mock
+        err = io.StringIO()
+        with mock.patch.object(cli.sys, "platform", platform), \
+                contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(err):
+            code = cli.main(argv)
+        return code, out.getvalue(), err.getvalue()
+
+    def test_check_on_linux_says_windows_only(self):
+        code, out, err = self._run_real(["check"], "linux")
+        self.assertEqual(code, cli.EXIT_NOT_WINDOWS)
+        self.assertIn("윈도우 전용", err)
+        self.assertNotIn("문제가 없습니다", out + err)
+
+    def test_other_live_commands_blocked(self):
+        for argv in (["snapshot"], ["upgrade"], ["updates"], ["gamemode", "status"],
+                     ["tweaks", "apply", "x"]):
+            code, _, err = self._run_real(argv, "darwin")
+            self.assertEqual(code, cli.EXIT_NOT_WINDOWS, argv)
+            self.assertIn("윈도우 전용", err)
+
+    def test_offline_commands_still_work(self):
+        code, _, err = self._run_real(["tweaks", "backups"], "linux")
+        self.assertEqual(code, 0)
+        self.assertNotIn("윈도우 전용", err)

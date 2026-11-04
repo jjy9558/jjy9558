@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 
 DEFAULTS = {
     "appids": [],
@@ -19,6 +20,21 @@ DEFAULTS = {
     "out_dir": "out",
     "state_file": "state.json",
 }
+
+
+def default_config_path(env=None, cwd=None):
+    """GAMECAL_HOME/gamecal.json > (옛 ./gamecal.json 이 있으면 그것) > ~/.gamecal/gamecal.json"""
+    env = os.environ if env is None else env
+    home = env.get("GAMECAL_HOME")
+    if home:
+        return os.path.join(os.path.expanduser(home), "gamecal.json")
+    new = os.path.join(os.path.expanduser("~"), ".gamecal", "gamecal.json")
+    legacy = os.path.join(cwd or os.getcwd(), "gamecal.json")
+    if os.path.isfile(legacy) and not os.path.exists(new):
+        print("안내: 현재 폴더의 옛 gamecal.json 을 사용합니다. 사용자 폴더로 옮기려면 %s 로 이동하세요 "
+              "(또는 GAMECAL_HOME 지정)." % new, file=sys.stderr)
+        return legacy
+    return new
 
 
 def _merge(base, over):
@@ -48,6 +64,8 @@ def add_appid(path, appid):
     if os.path.exists(path):
         with open(path, encoding="utf-8") as f:
             raw = json.load(f)
+    d = os.path.dirname(os.path.abspath(path))
+    os.makedirs(d, exist_ok=True)
     ids = [int(x) for x in raw.get("appids", [])]
     if int(appid) in ids:
         return False

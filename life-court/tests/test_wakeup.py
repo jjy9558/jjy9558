@@ -208,3 +208,18 @@ class Speak(WakeupBase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DefaultDbTests(unittest.TestCase):
+    def test_default_db_location(self):
+        from pathlib import Path
+        from lifecourt.wakeup import default_db
+        self.assertEqual(default_db({"SOUNDWATCH_HOME": "/x"}), Path("/x/soundwatch.db"))
+        import os, tempfile
+        cwd = os.getcwd()
+        with tempfile.TemporaryDirectory() as d:
+            os.chdir(d)
+            try:
+                self.assertEqual(default_db({}), Path.home() / ".soundwatch" / "soundwatch.db")
+            finally:
+                os.chdir(cwd)

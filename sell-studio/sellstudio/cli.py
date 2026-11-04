@@ -26,7 +26,24 @@ from . import privacy
 from ._jjkit import llm
 
 DEFAULT_LLM_URL = "http://127.0.0.1:8080/v1"
-DEFAULT_LEDGER = "sell-ledger.json"
+LEGACY_LEDGER = "sell-ledger.json"
+
+
+def default_ledger(env=None, cwd=None, err=None):
+    """SELLSTUDIO_LEDGER > (옛 위치 ./sell-ledger.json 이 이미 있으면 그것) > ~/.sell-studio/sell-ledger.json"""
+    env = os.environ if env is None else env
+    if env.get("SELLSTUDIO_LEDGER"):
+        return env["SELLSTUDIO_LEDGER"]
+    new = os.path.join(os.path.expanduser("~"), ".sell-studio", LEGACY_LEDGER)
+    legacy = os.path.join(cwd or os.getcwd(), LEGACY_LEDGER)
+    if os.path.isfile(legacy) and not os.path.exists(new):
+        print("안내: 현재 폴더의 옛 장부(%s)를 사용합니다. 사용자 폴더로 옮기려면: 파일을 %s 로 이동"
+              % (LEGACY_LEDGER, new), file=err or sys.stderr)
+        return legacy
+    return new
+
+
+DEFAULT_LEDGER = "~/.sell-studio/sell-ledger.json"
 
 
 class CliError(Exception):
@@ -99,7 +116,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     lgp = sub.add_parser("ledger", help="되팔이 장부: add / sold / list / report")
     common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("--ledger", default=os.environ.get("SELLSTUDIO_LEDGER", DEFAULT_LEDGER), help="장부 JSON (기본 %s)" % DEFAULT_LEDGER)
+    common.add_argument("--ledger", default=None, help="장부 JSON (기본 %s, 환경변수 SELLSTUDIO_LEDGER)" % DEFAULT_LEDGER)
     common.add_argument("--today", help=argparse.SUPPRESS)
     ls = lgp.add_subparsers(dest="lcmd", required=True)
     a = ls.add_parser("add", parents=[common], help="매입 기록")
@@ -408,6 +425,8 @@ def _ledger_today(args) -> date:
 
 
 def cmd_ledger(args, out):
+    if not args.ledger:
+        args.ledger = default_ledger()
     today = _ledger_today(args)
     try:
         data = lg.load(args.ledger)

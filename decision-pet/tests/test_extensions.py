@@ -432,3 +432,14 @@ class LunchTests(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LlmEndpointEnvTest(unittest.TestCase):
+    def test_env_overrides_config_and_default(self):
+        from decision_pet.storage import llm_endpoint, DEFAULT_LLM_URL
+        self.assertEqual(llm_endpoint({}, env={}), DEFAULT_LLM_URL)
+        self.assertEqual(DEFAULT_LLM_URL, "http://localhost:1234/v1")
+        self.assertEqual(llm_endpoint({"endpoint": "http://a/v1"}, env={}), "http://a/v1")
+        self.assertEqual(llm_endpoint({"endpoint": "http://a/v1"},
+                                      env={"DECISION_PET_LLM_URL": "http://b:8080/v1"}),
+                         "http://b:8080/v1")

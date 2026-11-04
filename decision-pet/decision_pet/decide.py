@@ -4,6 +4,8 @@ import random
 import re
 import urllib.request
 
+from .storage import llm_endpoint
+
 MIN_OPTIONS = 2
 MAX_OPTIONS = 5
 
@@ -105,7 +107,7 @@ def decide_llm(options, llm_config, rng=None, opener=None):
     if llm_config.get("api_key"):
         headers["Authorization"] = "Bearer " + llm_config["api_key"]
     try:
-        req = urllib.request.Request(_chat_url(llm_config.get("endpoint", "")),
+        req = urllib.request.Request(_chat_url(llm_endpoint(llm_config)),
                                      data=json.dumps(body).encode("utf-8"),
                                      headers=headers, method="POST")
         resp = opener(req, timeout=llm_config.get("timeout", 8))

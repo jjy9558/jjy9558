@@ -74,7 +74,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     w = sub.add_parser("wakeup", help="누가 날 깨웠나 재판(sound-watch 기록을 읽기 전용으로 사용)")
     _common(w)
-    w.add_argument("--db", help="sound-watch DB 경로(기본: $SOUNDWATCH_HOME/soundwatch.db 또는 ./data/soundwatch.db)")
+    w.add_argument("--db", help="sound-watch DB 경로(기본: $SOUNDWATCH_HOME/soundwatch.db, 없으면 ~/.soundwatch/soundwatch.db)")
     w.add_argument("--from", dest="t_from", default="00:00", help="밤 시작 HH:MM (기본 00:00)")
     w.add_argument("--to", dest="t_to", default="07:00", help="밤 끝 HH:MM (기본 07:00, from보다 이르면 자정을 넘김)")
     w.add_argument("--woke", help="깬 시각 HH:MM(주범을 이 시각에 가장 가까운 소리로)")

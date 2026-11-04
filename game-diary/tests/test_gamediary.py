@@ -261,6 +261,20 @@ class AlbumTests(unittest.TestCase):
         c = load_config("/nonexistent/c.json")
         self.assertEqual(c["base_url"], "http://127.0.0.1:8080/v1")
 
+    def test_out_dir_default_is_user_dir_with_legacy_fallback(self):
+        cwd = os.getcwd()
+        with tempfile.TemporaryDirectory() as d:
+            os.chdir(d)
+            try:
+                c = load_config("/nonexistent/c.json")
+                self.assertIn(".gamediary", c["out_dir"])
+                os.makedirs("out")
+                open(os.path.join("out", "album.html"), "w").close()
+                c = load_config("/nonexistent/c.json")
+                self.assertEqual(c["out_dir"], "out")
+            finally:
+                os.chdir(cwd)
+
 
 if __name__ == "__main__":
     unittest.main()

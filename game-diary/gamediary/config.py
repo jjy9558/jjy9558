@@ -1,6 +1,7 @@
 """설정 로드/저장. 기본 위치: ~/.gamediary/config.json (환경변수 GAMEDIARY_CONFIG 로 변경)."""
 import json
 import os
+import sys
 
 HOME_DIR = os.path.join("~", ".gamediary")
 
@@ -18,7 +19,7 @@ DEFAULTS = {
     "names_cache": os.path.join(HOME_DIR, "games.json"),
     "use_steam_buddy": True,
     "db_path": os.path.join(HOME_DIR, "gamediary.sqlite3"),
-    "out_dir": "out",
+    "out_dir": os.path.join(HOME_DIR, "out"),
 }
 
 KINDS = ("steam", "gamebar", "folder")
@@ -38,6 +39,13 @@ def load_config(path=None):
         if not isinstance(user, dict):
             raise ValueError("설정 파일은 JSON 객체여야 합니다: " + p)
         cfg.update(user)
+        legacy_out = "out_dir" not in user
+    else:
+        legacy_out = True
+    if legacy_out and os.path.isdir("out") and os.listdir("out"):
+        cfg["out_dir"] = "out"
+        print("안내: 현재 폴더의 옛 out/ 을 계속 씁니다. 사용자 폴더(%s)로 옮기려면 out/ 내용을 옮기고 "
+              "설정에서 out_dir 을 지정/삭제하세요." % os.path.expanduser(DEFAULTS["out_dir"]), file=sys.stderr)
     cfg["_path"] = p
     return cfg
 

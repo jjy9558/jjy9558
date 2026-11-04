@@ -7,6 +7,7 @@ from __future__ import annotations
 import math
 import os
 import sqlite3
+import sys
 from dataclasses import dataclass
 from datetime import date as Date
 from datetime import datetime, timedelta
@@ -89,8 +90,16 @@ def resolve_woke(woke: str, start: datetime, end: datetime) -> datetime:
 
 # -- sound-watch 읽기 전용 -------------------------------------------------------
 def default_db(env) -> Path:
-    home = env.get("SOUNDWATCH_HOME") or "data"
-    return Path(home).expanduser() / "soundwatch.db"
+    """SOUNDWATCH_HOME > (옛 ./data/soundwatch.db 가 있으면 그것) > ~/.soundwatch (sound-watch 기본과 동일)"""
+    home = env.get("SOUNDWATCH_HOME")
+    if home:
+        return Path(home).expanduser() / "soundwatch.db"
+    legacy = Path("data") / "soundwatch.db"
+    if legacy.is_file():
+        print("안내: 현재 폴더의 옛 data/soundwatch.db 를 사용합니다. sound-watch 기본 위치는 ~/.soundwatch 입니다.",
+              file=sys.stderr)
+        return legacy
+    return Path.home() / ".soundwatch" / "soundwatch.db"
 
 
 def read_night(db: Path, a: float, b: float) -> tuple[list[dict], list[dict]]:

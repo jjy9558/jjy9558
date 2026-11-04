@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "homelab"
+version = "0.1.0"
+description = "한 번에 켜고 끄는 홈랩 런처"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+homelab = "homelab.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["homelab", "homelab.*"]

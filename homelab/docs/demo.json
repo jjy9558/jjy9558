@@ -1,0 +1,11 @@
+{
+  "title": "homelab",
+  "project": "..",
+  "width": 96,
+  "height": 24,
+  "steps": [
+    {"type": "comment", "text": "# 홈랩 런처: 토큰 생성 + 설정 + 켜기/끄기"},
+    {"type": "cmd", "run": "python -m homelab --help", "show": "homelab --help"},
+    {"type": "pause", "seconds": 1.0}
+  ]
+}

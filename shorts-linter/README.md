@@ -72,6 +72,37 @@ python -m shortslint titles clip.meta.json [--transcript clip.txt]
   대본 약속 일치 40(기존 B9 `promise` 로직 재사용: 키워드 일치율, 숫자·이름·결말/반전 불일치 감점) + 과장 금칙어 20
   (`clickbait_words`, `titles.exaggeration_words`, `banned_words`). 대본은 `--transcript`, meta의 `transcript`, 옆의 `<이름>.txt|srt|ass` 순으로 찾으며 없으면 약속 항목은 중립(20점) 처리합니다.
 
+### 첫 3초 훅 점검 / 훅 문장 사전
+
+```bash
+python -m shortslint hook clip.meta.json [--video clip.mp4] [--no-audio] [--book hooks.json] [--strict]
+python -m shortslint hooks list [--tag 질문]
+python -m shortslint hooks add --text "{인물}이 {사건}한 이유" --tags 질문,갈등 [--id my01]
+python -m shortslint hooks edit t05 --text "..." --tags "..." ; python -m shortslint hooks remove t05
+python -m shortslint hooks suggest clip.meta.json
+python -m shortslint hooks use t05 --video clip01     # 사용 기록 (같은 영상+템플릿은 한 번만 셈)
+python -m shortslint hooks check [--strict]           # 최근 N편 과다 사용 경고
+```
+
+- **hook**: `meta.json`, `.srt/.ass`, `.txt` 중 무엇을 줘도 옆 파일(`<이름>.srt`, `.meta.json`, `.txt`, 영상)을 자동 탐색합니다.
+  SRT/ASS 타이밍이 있으면 **시작 3초 안에 시작하는 큐**(`hook.seconds`)를, 없으면 대본 첫 문장(길면 공백 제외 약 20자, `hook.fallback_chars`)을 훅으로 봅니다.
+  100점 만점 규칙: 도입 40(숫자·질문·인용·갈등 표현 중 하나 32점, 둘 이상 40점, 없으면 15점, "안녕하세요 여러분"/"오늘은" 같은 인사·군더더기로 시작하면 0점) +
+  길이 30(공백 제외 6~40자 만점, 41~60자 20점, 60자 초과 10점, 6자 미만 15점) + 제목 약속 키워드 포함 30(`promise.keywords` 재사용, 제목이 없으면 중립 15점).
+  70점 이상이고 군더더기 시작이 아니면 ✅, 아니면 ⚠️이며 이유를 한 줄씩 보여 주고 사전 템플릿으로 채운 재작성 제안 3개를 출력합니다.
+  첫 대사가 1초보다 늦게 시작해도 ⚠️입니다. 판정은 전부 규칙 기반(결정적)이며, 프로젝트의 LLM 판정은 제목-대본 약속 일치용이라 훅 점검에는 쓰지 않습니다.
+  규칙 단어는 설정 `hook.filler_starts`, `hook.conflict_words`, `hook.question_words` 등으로 바꿀 수 있습니다.
+- **오디오 시작 점검(선택)**: 영상 파일(`--video`, meta의 `video`, 또는 옆의 `<이름>.mp4` 등)과 `ffmpeg`가 있으면 앞 3초만 `silencedetect`(기존 파서 재사용)로 분석해
+  오디오가 0.5초(`hook.audio_start_max`) 안에 시작하는지 봅니다. 영상/ffmpeg가 없거나 `--no-audio`면 `⏭️ 건너뜀`으로 표시하고 나머지는 그대로 동작합니다.
+- **hooks (훅 문장 사전)**: 일반적인 한국어 훅 틀 30개가 기본 내장돼 있고(특정 크리에이터 문구가 아님) 사용자 데이터 폴더의 `hooks.json`에 저장됩니다.
+  위치: `$SHORTSLINT_DATA_DIR` > Windows `%APPDATA%\shortslint` > `$XDG_DATA_HOME/shortslint` > `~/.local/share/shortslint`. `--book`으로 파일을 직접 지정할 수 있고, 첫 수정 전까지는 파일을 만들지 않습니다.
+  JSON을 직접 편집해도 됩니다 (`templates[].id/text/tags`, `usage[]`).
+  - 슬롯: `{인물}`(제목/claims의 시어머니·남편 등), `{숫자}`("3가지"), `{키워드}`(제목의 첫 핵심어), `{사건}`(제목의 마지막 핵심어, 없으면 `claims[0]`).
+    조사는 `{인물:이/가}`, `{키워드:을/를}`, `{숫자:으로/로}`처럼 쓰면 받침에 맞춰 붙습니다. 값을 못 채우는 템플릿은 건너뛰고, 하나도 못 채우면 일반 문장 3개를 제안합니다.
+    자동 채움은 단순 규칙이라 어색할 수 있으니 제안은 초안으로 보고 다듬어 쓰세요.
+  - `suggest`/`hook`의 제안 순서는 사전 순서(결정적)이며, 최근 많이 쓴 템플릿은 뒤로 밀리고 `⚠️ 최근 자주 사용`이 붙습니다.
+  - **과다 사용 경고**: `hooks use`로 기록한 최근 `hooks.overuse_window`(기본 5)건 중 같은 템플릿이 `hooks.overuse_max`(기본 1)회를 넘으면 경고합니다.
+    `similar`의 재활용 콘텐츠 경고와 같은 취지로, 똑같은 도입 문장을 반복하지 않게 하는 용도입니다. 경고는 종료 코드 0이며 `--strict`일 때만 1입니다.
+
 ## 검사 항목과 이유
 
 ### 영상 (ffprobe/ffmpeg)

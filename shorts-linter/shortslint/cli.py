@@ -2,7 +2,7 @@ import argparse
 import os
 import sys
 
-from . import disclose, metadata, report, runner, similar, sources, titles
+from . import disclose, hookcheck, metadata, phrasebook, report, runner, similar, sources, titles
 from .config import load_config
 
 
@@ -42,7 +42,78 @@ def build_parser():
     s.add_argument("meta")
     s.add_argument("--transcript", help="대본 파일 (생략 시 meta/옆 파일 자동 탐색)")
     s.add_argument("--config")
+    s = sub.add_parser("hook", help="첫 3초 훅 점검 (meta.json/.srt/.ass/.txt)")
+    s.add_argument("target")
+    s.add_argument("--video", help="영상 파일 (생략 시 옆 파일 자동 탐색, 오디오 시작 점검용)")
+    s.add_argument("--no-audio", action="store_true", help="오디오 시작 점검 생략")
+    s.add_argument("--book", help="훅 사전 JSON (기본: 사용자 데이터 폴더)")
+    s.add_argument("--config")
+    s.add_argument("--strict", action="store_true")
+    s = sub.add_parser("hooks", help="훅 문장 사전")
+    s.add_argument("action", choices=["list", "add", "edit", "remove", "suggest", "use", "check"])
+    s.add_argument("arg", nargs="?", help="suggest: meta.json / use,edit,remove: 템플릿 id")
+    s.add_argument("--tag")
+    s.add_argument("--text")
+    s.add_argument("--tags")
+    s.add_argument("--id", dest="tid")
+    s.add_argument("--video", help="use: 사용한 영상 이름")
+    s.add_argument("--book", help="훅 사전 JSON (기본: 사용자 데이터 폴더)")
+    s.add_argument("--config")
+    s.add_argument("--strict", action="store_true")
     return p
+
+
+def _hook_cmd(args):
+    try:
+        cfg = load_config(args.config)
+        book_path = args.book or phrasebook.default_path()
+        book = phrasebook.load(book_path)
+        if args.cmd == "hook":
+            r = hookcheck.run(args.target, cfg, book, args.video, not args.no_audio)
+            print(hookcheck.format_result(r))
+            return 1 if args.strict and not r["ok"] else 0
+        hk = cfg["hooks"]
+        a = args.action
+        if a == "list":
+            print(phrasebook.format_list(phrasebook.list_templates(book, args.tag)))
+            return 0
+        if a == "add":
+            tid = phrasebook.add(book, args.text, args.tags, args.tid)
+            phrasebook.save(book, book_path)
+            print("추가: %s" % tid)
+            return 0
+        if a == "edit":
+            phrasebook.edit(book, args.arg or args.tid, args.text, args.tags)
+            phrasebook.save(book, book_path)
+            print("수정: %s" % (args.arg or args.tid))
+            return 0
+        if a == "remove":
+            phrasebook.remove(book, args.arg or args.tid)
+            phrasebook.save(book, book_path)
+            print("삭제: %s" % (args.arg or args.tid))
+            return 0
+        if a == "use":
+            tid = args.arg or args.tid
+            added = phrasebook.use(book, tid, args.video)
+            phrasebook.save(book, book_path)
+            print("사용 기록: %s%s" % (tid, "" if added else " (이미 기록됨)"))
+        elif a == "suggest":
+            if not args.arg:
+                raise ValueError("meta.json 경로가 필요합니다")
+            meta = metadata.load_meta(args.arg)
+            rows = phrasebook.suggest(book, meta, hk["suggest_count"], hk["overuse_window"], hk["overuse_max"])
+            print(phrasebook.format_suggestions(rows))
+            return 0
+        over = phrasebook.overused(book, hk["overuse_window"], hk["overuse_max"])
+        lines = phrasebook.format_overuse(over, book, hk["overuse_window"])
+        for ln in lines:
+            print(ln)
+        if a == "check" and not lines:
+            print("✅ 최근 %d편 안에 과다 사용 템플릿 없음" % hk["overuse_window"])
+        return 1 if lines and args.strict else 0
+    except (OSError, ValueError) as e:
+        print("오류: %s" % e, file=sys.stderr)
+        return 2
 
 
 def _extra(args):
@@ -111,6 +182,8 @@ def main(argv=None):
     except Exception:  # noqa: BLE001
         pass
     args = build_parser().parse_args(argv)
+    if args.cmd in ("hook", "hooks"):
+        return _hook_cmd(args)
     if args.cmd in ("similar", "disclose", "sources", "titles"):
         return _extra(args)
     try:

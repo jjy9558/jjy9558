@@ -87,6 +87,27 @@ DEFAULTS = {
         "exaggeration_words": ["세상에", "믿을 수 없", "난리났", "대박", "미쳤다", "역대급",
                                "전설", "ㅋㅋㅋ", "!!", "???", "속보", "긴급", "필독", "꼭 보세요"],
     },
+    "hook": {
+        "seconds": 3.0,                 # 훅으로 보는 앞부분 길이
+        "fallback_chars": 20,           # 시간 정보가 없을 때 첫 문장 기준 글자 수(공백 제외)
+        "ok_score": 70,
+        "min_chars": 6,
+        "ideal_max_chars": 40,
+        "long_chars": 60,
+        "audio_start_max": 0.5,         # 오디오가 이 시간(초) 안에 시작해야 함
+        "audio_noise_db": -35,
+        "first_cue_late": 1.0,          # 첫 대사가 이보다 늦으면 경고
+        "filler_starts": ["안녕하세요", "안녕", "여러분", "오늘은", "오늘 ", "자 ", "자,", "음 ", "음,",
+                          "어 ", "저는", "이번 영상", "이번에는", "먼저", "구독", "좋아요", "반갑습니다"],
+        "conflict_words": ["배신", "거짓말", "싸움", "싸웠", "이혼", "폭로", "무시", "쫓겨", "해고", "의심",
+                           "몰래", "숨겼", "비밀", "화가", "분노", "울었", "끊었", "버렸", "속였", "고백"],
+        "question_words": ["왜", "어떻게", "무슨", "뭐", "누가", "어디", "언제"],
+    },
+    "hooks": {
+        "overuse_window": 5,            # 최근 N편 안에서
+        "overuse_max": 1,               # 같은 템플릿을 이 횟수 초과로 쓰면 경고
+        "suggest_count": 3,
+    },
     "llm": {
         "enabled": False,
         "base_url": "http://localhost:11434/v1",   # OpenAI 호환 (Ollama, llama.cpp 등)

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TextIO
 
 from . import __version__
-from . import claudemd, logscan, mcpweigh, repeats, route
+from . import baton, checkup, claudemd, logscan, mcpweigh, repeats, route
 from ._jjkit import claude_logs
 from .report import Report, to_html, to_markdown
 
@@ -50,6 +50,19 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--claude-md", action="append", default=[])
     a.add_argument("--mcp-file", action="append", default=[])
     common(a)
+    b = sub.add_parser("baton", help="세션 바톤: 새 세션으로 넘길 한국어 인수인계 메모")
+    b.add_argument("--session", help="세션 ID(= jsonl 파일 이름)")
+    b.add_argument("--latest", action="store_true", help="가장 최근 세션(기본)")
+    b.add_argument("--project", help="이 작업 폴더의 세션만")
+    b.add_argument("--logs", help="로그 루트(기본 ~/.claude/projects)")
+    b.add_argument("--cap", type=int, default=baton.DEFAULT_CAP, help="최대 글자 수(기본 2000)")
+    b.add_argument("--out", help="마크다운 저장 경로(없으면 화면 출력)")
+    k = sub.add_parser("checkup", help="건강검진표: 저장소 상태 점검 카드")
+    k.add_argument("repo_dir", nargs="?", default=".")
+    k.add_argument("--run", action="store_true", help="감지한 테스트 명령을 실제 실행")
+    k.add_argument("--timeout", type=int, default=300, help="테스트 제한 시간(초)")
+    k.add_argument("--large-kb", type=int, default=1024)
+    common(k)
     return p
 
 
@@ -133,7 +146,29 @@ def cmd_report(args, out):
     return _emit(full, args, out)
 
 
-COMMANDS = {"scan": cmd_scan, "mcp-weigh": cmd_mcp, "repeats": cmd_repeats, "claude-md-lint": cmd_lint,
+def cmd_baton(args, out):
+    root = _root(args.logs)
+    path = baton.find_session(root, session=args.session, latest=args.latest, project=args.project)
+    if path is None:
+        print("조건에 맞는 세션을 찾지 못했습니다.", file=sys.stderr)
+        return 2
+    text = baton.build_baton(baton.analyze(path), args.cap)
+    if args.out:
+        Path(args.out).write_text(text, encoding="utf-8")
+        print("저장:", args.out, file=out)
+    else:
+        out.write(text)
+    return 0
+
+
+def cmd_checkup(args, out):
+    if not Path(args.repo_dir).is_dir():
+        print(f"폴더가 없습니다: {args.repo_dir}", file=sys.stderr)
+        return 2
+    return _emit(checkup.build_report(args.repo_dir, run=args.run, timeout=args.timeout, large_kb=args.large_kb), args, out)
+
+
+COMMANDS = {"baton": cmd_baton, "checkup": cmd_checkup, "scan": cmd_scan, "mcp-weigh": cmd_mcp, "repeats": cmd_repeats, "claude-md-lint": cmd_lint,
             "route": cmd_route, "report": cmd_report}
 
 

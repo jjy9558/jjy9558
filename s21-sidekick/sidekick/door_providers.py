@@ -104,7 +104,11 @@ def open_ro(path, timeout=2):
     if not p.is_file():
         raise FileNotFoundError("db 없음")
     con = sqlite3.connect(p.resolve().as_uri() + "?mode=ro", uri=True, timeout=timeout)
-    con.execute("PRAGMA query_only=1")
+    try:
+        con.execute("PRAGMA query_only=1")
+    except Exception:
+        con.close()  # Windows 에서 열린 핸들이 파일 삭제를 막는다
+        raise
     return con
 
 

@@ -179,6 +179,7 @@ class SqliteFixtureBase(unittest.TestCase):
         con = sqlite3.connect(str(self.path))
         con.executescript(self.schema)
         self.con = con
+        self.addCleanup(con.close)  # tmp.cleanup 보다 먼저 실행됨 (Windows 파일 잠금)
 
     def finish(self):
         self.con.commit()

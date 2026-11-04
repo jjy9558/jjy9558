@@ -56,7 +56,7 @@ class Script:
                 raise ScriptError("step %d: files 는 {경로: 내용} 객체여야 해요." % i)
             for rel in files:
                 norm = os.path.normpath(rel)
-                if os.path.isabs(rel) or norm.startswith("..") or ":" in rel:
+                if os.path.isabs(rel) or rel.startswith(("/", "\\")) or norm.startswith("..") or ":" in rel:
                     raise ScriptError("step %d: setup 파일 경로는 샌드박스 안의 상대 경로여야 해요: %s" % (i, rel))
         return s
 

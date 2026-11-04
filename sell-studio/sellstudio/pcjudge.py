@@ -32,7 +32,12 @@ def find_judge(judge_cmd: str | None = None, judge_dir: str | None = None) -> tu
     """(argv 앞부분, cwd) 또는 None."""
     judge_cmd = judge_cmd or os.environ.get("SELLSTUDIO_JUDGE_CMD")
     if judge_cmd:
-        argv = shlex.split(judge_cmd)
+        # Windows 경로의 역슬래시가 POSIX 모드 shlex 에서 사라지므로 nt 에서는 non-posix 로 나누고 따옴표를 벗긴다.
+        if os.name == "nt":
+            argv = [a[1:-1] if len(a) > 1 and a[0] == a[-1] and a[0] in "\"'" else a
+                    for a in shlex.split(judge_cmd, posix=False)]
+        else:
+            argv = shlex.split(judge_cmd)
         if argv and (shutil.which(argv[0]) or Path(argv[0]).exists()):
             return argv, None
         return None

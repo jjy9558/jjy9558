@@ -154,5 +154,5 @@ def tree_state(root: Path) -> dict:
     for p in sorted(Path(root).rglob("*")):
         if p.is_file():
             st = p.stat()
-            out[str(p.relative_to(root))] = (p.read_bytes(), st.st_mtime_ns)
+            out[p.relative_to(root).as_posix()] = (p.read_bytes(), st.st_mtime_ns)
     return out

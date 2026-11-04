@@ -353,6 +353,14 @@ class Handler(BaseHTTPRequestHandler):
         limit = self.hub.cfg["server"]["max_body_kb"] * 1024
         if n > limit:
             self.close_connection = True
+            # 본문을 읽지 않고 닫으면 Windows 클라이언트가 응답 대신 연결 리셋(10053/10054)을 받는다.
+            # 적당한 크기까지는 버리면서 읽어 정상적으로 413 을 돌려준다.
+            left = min(n, 8 * 1024 * 1024)
+            while left > 0:
+                chunk = self.rfile.read(min(65536, left))
+                if not chunk:
+                    break
+                left -= len(chunk)
             raise ApiError(413, "요청이 너무 큽니다 (최대 %dKB)" % self.hub.cfg["server"]["max_body_kb"])
         raw = self.rfile.read(n) if n > 0 else b""
         try:

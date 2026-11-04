@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TextIO
 
 from . import __version__
-from . import courts, engine, llmphrase, store
+from . import courts, engine, llmphrase, store, wakeup
 from ._jjkit import llm, notify
 
 EPILOG = """예:
@@ -16,6 +16,7 @@ EPILOG = """예:
   life-court late --consent --minutes 25 --meeting "금요 저녁" --excuse "버스가 안 와서"
   life-court bet --a 민수 --b 지연 --condition "축구 승부 예측" --winner 민수 --stake 커피
   life-court toast 민수:개발자 지연 --occasion 송년회
+  life-court wakeup --db soundwatch.db --woke 03:40     # 누가 날 깨웠나 재판
 """
 
 
@@ -70,6 +71,13 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("names", nargs="*", help="이름 또는 이름:직업")
     t.add_argument("--occasion", default="")
     t.add_argument("--count", type=int, default=5)
+
+    w = sub.add_parser("wakeup", help="누가 날 깨웠나 재판(sound-watch 기록을 읽기 전용으로 사용)")
+    _common(w)
+    w.add_argument("--db", help="sound-watch DB 경로(기본: $SOUNDWATCH_HOME/soundwatch.db 또는 ./data/soundwatch.db)")
+    w.add_argument("--from", dest="t_from", default="00:00", help="밤 시작 HH:MM (기본 00:00)")
+    w.add_argument("--to", dest="t_to", default="07:00", help="밤 끝 HH:MM (기본 07:00, from보다 이르면 자정을 넘김)")
+    w.add_argument("--woke", help="깬 시각 HH:MM(주범을 이 시각에 가장 가까운 소리로)")
 
     f = sub.add_parser("forget", help="저장된 기록 지우기")
     f.add_argument("--data-dir")
@@ -185,6 +193,19 @@ def cmd_toast(args, ctx: Ctx) -> int:
     return _emit(j, args, ctx, [courts.parse_guest(g)[0] for g in args.names])
 
 
+def cmd_wakeup(args, ctx: Ctx) -> int:
+    if args.llm:  # 사람 이름이 끼어들 틈을 없애려고 wakeup은 템플릿 문장만 쓴다
+        print("경고: wakeup은 --llm을 쓰지 않고 템플릿 원문으로 출력합니다.", file=ctx.err)
+        args.llm = False
+    d = _date(args, ctx)
+    start, end = wakeup.night_window(d, args.t_from, args.t_to)
+    woke = wakeup.resolve_woke(args.woke, start, end) if args.woke else None
+    db = Path(args.db) if args.db else wakeup.default_db(ctx.env)
+    events, dets = wakeup.read_night(db, start.timestamp(), end.timestamp())
+    j = wakeup.judge_wakeup(events, dets, d, start, end, woke=woke, seed=args.seed)
+    return _emit(j, args, ctx, [])
+
+
 def cmd_forget(args, ctx: Ctx) -> int:
     if not (args.night or args.late or args.who):
         print("무엇을 지울지 --night, --late, --who 이름 중 하나를 고르세요.", file=ctx.err)
@@ -202,7 +223,7 @@ def cmd_forget(args, ctx: Ctx) -> int:
 
 
 COMMANDS = {"night-snack": cmd_night, "late": cmd_late, "bet": cmd_bet, "toast": cmd_toast,
-            "forget": cmd_forget}
+            "wakeup": cmd_wakeup, "forget": cmd_forget}
 
 
 def main(argv: list[str] | None = None, out: TextIO | None = None, *, err: TextIO | None = None,

@@ -1,7 +1,7 @@
 # gamecal - 내 게임 캘린더
 
 Steam 보유 게임의 공지를 모아 **점검/이벤트 캘린더(.ics 구독 피드)**, **서비스 종료 D-day 경보**,
-**패치노트 한국어 요약 다이제스트**를 만들어 주는 파이썬(표준 라이브러리만, 3.9+) 도구입니다.
+**패치노트 한국어 요약 다이제스트**를 만들어 주는 파이썬(표준 라이브러리만, 3.12+) 도구입니다.
 
 <!-- demo:start -->
 ![데모](docs/demo.svg)
@@ -23,12 +23,14 @@ Steam 보유 게임의 공지를 모아 **점검/이벤트 캘린더(.ics 구독
 
 ```bash
 cd game-calendar
-cp gamecal.example.json gamecal.json     # 편집
+mkdir -p ~/.gamecal && cp gamecal.example.json ~/.gamecal/gamecal.json   # 편집 (Windows: %USERPROFILE%\.gamecal)
 python3 -m gamecal add 570               # appid 추가
 python3 -m gamecal list                  # 추적 게임/예정된 서비스 종료
 python3 -m gamecal run --dry-run         # 저장 없이 시험 (LLM 미사용)
 python3 -m gamecal run                   # 실제 실행
 ```
+
+설정 파일 기본 위치는 `$GAMECAL_HOME/gamecal.json` → `~/.gamecal/gamecal.json` 입니다. `--config 경로` 로 직접 지정할 수도 있습니다. 옛 위치인 현재 폴더의 `gamecal.json` 이 있으면 그것을 쓰고 옮기라는 안내를 출력합니다. 출력 파일(`out/`)과 `state.json` 도 설정 파일이 있는 폴더 기준입니다.
 
 `gamecal.json` 주요 항목 (상대 경로는 설정 파일 위치 기준):
 

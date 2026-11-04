@@ -4,7 +4,7 @@
 **하나의 작업 큐**로 묶습니다. 폰에 대고 "자비스, 이 PDF 요약해줘"라고 하면, 미니PC 허브가 작업을 만들고,
 5080이 꺼져 있으면 Wake-on-LAN으로 깨우고, 5080 워커가 로컬 LLM으로 처리한 뒤, 끝나면 폰이 소리 내어 알려줍니다.
 
-- Python 3.9+, **표준 라이브러리만** (설치할 것 없음)
+- Python 3.12+, **표준 라이브러리만** (설치할 것 없음)
 - 허브 = HTTP JSON API + sqlite 작업 큐 + 대시보드 한 장
 - 워커 = 허브에서 자기 능력(caps)에 맞는 작업을 빌려(lease) 와서 처리하는 프로세스
 - 모든 기기는 Tailscale로 연결 (허브는 tailnet 안에만 엽니다)
@@ -193,29 +193,16 @@ N번 승인·취소 / 클로드한테 … 시켜줘 / 로컬 모델한테 … �
 
 ## 5. S21 사이드킥 연동 (`notify.say`)
 
-`s21-sidekick` 코드를 확인한 결과: 폰 페이지는 `GET /api/events`를 롱폴링해서 `kind == "say"`인 이벤트를 읽어 주지만,
-**외부에서 say 이벤트를 넣는 범용 엔드포인트는 아직 없습니다** (`/api/utterance`는 혼잣말 트리거 판정용,
-`/api/arrival`은 귀가 집사용). 그래서 `notify.say` 핸들러는 `POST {sidekick_url}/api/say`
-(헤더 `X-Sidekick-Token`, 본문 `{"text": "...", "module": "jarvis"}`)로 보내 보고, URL이 없거나 404면
-**로그만 남기고** `delivered: false`로 끝냅니다 (재시도 안 함).
+`notify.say` 핸들러는 `s21-sidekick` 의 외부용 `POST /api/say` 로 말을 보내고, 폰이 소리 내어 읽습니다.
 
-사이드킥 쪽에 필요한 코드 (그 프로젝트 담당자가 추가할 것 — 이 저장소에서는 건드리지 않음):
+- 주소: `{sidekick_url}/api/say` (`sidekick_url` 설정)
+- 헤더: `X-Sidekick-Token: <sidekick 토큰>`
+- 본문: `{"text": "...", "module": "jarvis"}`
 
-```python
-# sidekick/server.py, Handler 안
-def r_say(self, q):
-    body = self._json()
-    text = str(body.get("text") or "").strip()[:500]
-    if not text:
-        raise ValueError("text가 비었습니다")
-    ev = self.app.events.say(text, module=str(body.get("module") or "jarvis")[:32])
-    return 200, {"ok": True, "id": ev["id"]}
+사이드킥 쪽 제한: 분당 호출 횟수(`say.max_per_minute`, 기본 12회)와 글자 수(`say.max_chars`, 기본 300자)가 있고, 넘치면 429 입니다.
+`say.enabled: false` 면 403 입니다. URL 이 없거나 사이드킥이 실패하면 로그만 남기고 `delivered: false` 로 끝냅니다 (재시도 안 함).
 
-# ROUTES 에 추가
-("POST", "/api/say"): Handler.r_say,
-```
-
-그 전까지는 허브 대시보드를 폰에서 열어 두면(소리 읽기 켬) 같은 알림을 허브 이벤트 스트림으로 직접 받습니다.
+사이드킥 설정 방법은 `s21-sidekick/README.md` 의 "다른 프로그램과 연결 (`/api/say`, 이벤트 전달)" 절을 보세요.
 
 ## 6. HTTP API
 

@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "s21-sidekick"
 version = "0.1.0"
 description = "남는 갤럭시 S21을 Claude의 눈·귀·입으로: 혼잣말 디버거, 침대 탈출 알람, 귀가 집사, 출발 체크, 커밋 관중석, rm -rf 결재 보고"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 dependencies = []
 
 [project.optional-dependencies]

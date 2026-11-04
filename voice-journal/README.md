@@ -6,12 +6,13 @@
 ![데모](docs/demo.svg)
 <!-- demo:end -->
 
-- Python 3.9+, **표준 라이브러리만** (sqlite3 / http.server). 네트워크로 나가는 코드는 없습니다.
+- Python 3.12+, **표준 라이브러리만** (sqlite3 / http.server). 네트워크로 나가는 코드는 없습니다.
 - **텍스트가 입력**입니다. STT는 범위 밖 (폰의 Web Speech, 다른 도구 무엇이든 텍스트만 넘기면 됨).
 - 로컬 LLM(OpenAI 호환)은 **선택**. 없거나 실패해도 규칙 기반으로 똑같이 동작합니다.
 
 ```
-python -m vjournal <명령>        # 저장소 루트에서 실행. 또는 PYTHONPATH 에 이 폴더를 추가
+cd voice-journal                        # 이 폴더에서 실행해야 합니다 (저장소 루트에서는 No module named vjournal)
+python -m vjournal <명령>                # 다른 곳에서 쓰려면: PYTHONPATH=/경로/voice-journal python -m vjournal <명령>
 ```
 
 데이터는 `~/.vjournal/journal.db` (sqlite 한 파일). `--db 경로` 또는 환경변수 `VJOURNAL_DB` 로 바꿉니다.

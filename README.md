@@ -2,6 +2,18 @@
 
 Claude Code로 만든 개인 도구 프로젝트들이 모여 있는 곳입니다.
 
+## 시작하기
+
+처음이면 [homelab](homelab/)부터 보세요. 저장소 루트에서 이 세 명령이면 토큰·설정 생성, 점검, 서버 켜기까지 됩니다.
+
+```
+python homelab/homelab_run.py init     # 토큰 생성 + 프로젝트별 설정 파일 쓰기
+python homelab/homelab_run.py doctor   # 설치 점검
+python homelab/homelab_run.py up       # 서버 켜기 (백그라운드)
+```
+
+자세한 순서는 [homelab/README.md](homelab/README.md), 프로젝트별 상태와 직접 넣어야 할 값은 [docs/PROTOTYPE.md](docs/PROTOTYPE.md) 에 있습니다.
+
 ## 프로젝트
 
 ### 폰·집 (S21)
@@ -72,6 +84,8 @@ Claude Code로 만든 개인 도구 프로젝트들이 모여 있는 곳입니�
 
 | 프로젝트 | 설명 | 상태 |
 |---|---|---|
+| [homelab](homelab/) | 한 번에 켜고 끄는 홈랩 런처: 설정 생성, 서버 켜기/끄기/상태, 주기 작업 등록, 점검 (설치·실행 진입점) | v0.1 |
+| [homelab-e2e](homelab-e2e/) | 통합 테스트: 프로젝트끼리 실제로 말이 통하는지 시나리오별로 확인 (`python -m homelabe2e projects`) | v0.1 |
 | [jjkit](jjkit/) | 공통 기반 모듈 (llm·notify·redact·httpkit 등). 표준 라이브러리만, 각 프로젝트에 `_jjkit/`로 복사해서 사용 | v0.1 |
 
 ## 포트
@@ -88,6 +102,7 @@ Claude Code로 만든 개인 도구 프로젝트들이 모여 있는 곳입니�
 | phone-home | 8790 |
 | shorts-feedback | 8791 |
 | jarvis-hub | 8800 |
+| life-nagger (이벤트 수신기, 기본 꺼짐) | 8799 |
 
 ## 공통 기반 (jjkit)
 

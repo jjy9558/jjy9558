@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "steam-buddy"
 version = "0.1.0"
 description = "스팀 구매 결정 비서: 사기 전 체크, 환불 기한 추적, 구매 후 돌아보기"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 dependencies = []
 
 [project.scripts]

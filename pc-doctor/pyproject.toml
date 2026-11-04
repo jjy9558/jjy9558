@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "pc-doctor"
 version = "0.1.0"
 description = "C5 PC 닥터: 내 PC 병목 분석·업그레이드 추천, 윈11 짜증 해결 프로필, 업데이트 신호등, 설정 스냅샷, 게임 모드"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 dependencies = []
 
 [project.scripts]

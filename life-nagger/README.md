@@ -9,7 +9,7 @@ Windows PC(게임 + 코딩)에서 돌면서 **새벽 게임, 굳은 엉덩이, �
 ![데모](docs/demo.svg)
 <!-- demo:end -->
 
-- Python 3.9+ , **표준 라이브러리만** (pip 설치 없음)
+- Python 3.12+ , **표준 라이브러리만** (pip 설치 없음)
 - 네트워크는 *내가 켠 출력 채널*(ntfy, sidekick, 로컬 LLM)에만 씁니다. 기본은 전부 꺼짐
 - 모든 외부 명령은 **인자 리스트(shell=False)** 로만 호출
 
@@ -90,24 +90,30 @@ python -m nagger report --week [--last]   # "이번 주 한숨 147회, 화요일
 
 각 채널에 `min_level`(`info`/`warn`/`urgent`)을 줄 수 있습니다.
 
-### s21-sidekick 연동 (수정 없이 읽기만 했습니다)
+### s21-sidekick 연동
 
-sidekick의 API(`X-Sidekick-Token` 헤더 필요)를 읽어 본 결과, 외부 프로그램이 폰에 말을 시키는 엔드포인트가 **아직 없습니다** (`events.say()`는 서버 내부 모듈 전용).
-그래서 nagger는 아래 엔드포인트를 호출하도록 만들어 두었고, **sidekick 쪽에 없으면 404를 받고 그 채널을 스스로 꺼서** 다른 채널엔 영향이 없습니다.
+**말하기 (sidekick 채널)**: `outputs.sidekick.enabled: true` 면 nagger 가 `POST {base_url}/api/say` 로
+`{"text": "...", "module": "nagger-<종류>"}` 를 보내고, 폰이 그 문장을 소리 내어 읽습니다.
+헤더는 `X-Sidekick-Token`, 토큰은 환경변수 `SIDEKICK_TOKEN` 또는 `outputs.sidekick.token` 입니다.
+`base_url` 기본값은 `http://127.0.0.1:8765` (s21-sidekick 기본 포트)입니다.
+사이드킥 쪽 제한은 분당 `say.max_per_minute`회(기본 12)이므로 `min_level` 을 `warn` 이상으로 두는 것을 권합니다.
 
-> **TODO (s21-sidekick, 이 프로젝트에서는 수정하지 않음)**
-> `POST /api/say` — 바디 `{"text": "...", "module": "nagger-mombot"}` → `self.app.events.say(text, module=module)` 후 `{"ok": true}`.
-> (`r_arrival`이 `events.say(...)`를 부르는 모양 그대로.)
+**폰 버튼 → nagger (이벤트 수신기)**: nagger 는 `events.enabled: true` 일 때 `events.host:events.port`
+(기본 `127.0.0.1:8799`)에서 수신기를 엽니다. `events.token` 이 비어 있으면 시작을 거부합니다.
+sidekick 설정의 `forward_events` 에 넣으면 폰 버튼 이벤트가 이 수신기로 전달됩니다 (`s21-sidekick/README.md` 참고):
 
-토큰은 환경변수 `SIDEKICK_TOKEN` 또는 `outputs.sidekick.token`.
+```json
+"forward_events": [
+  {"url": "http://127.0.0.1:8799/api/event", "token_env": "NAGGER_EVENTS_TOKEN", "types": ["sigh"]}
+]
+```
 
-**한숨을 폰에서 세기**: nagger는 선택적으로 로컬 수신기를 엽니다 (`events.enabled: true` + `events.token` 필수, 토큰 없으면 시작 거부, 기본 `127.0.0.1:8799`).
+`NAGGER_EVENTS_TOKEN` 에는 nagger 의 `events.token` 과 같은 값을 넣습니다. 직접 보내 볼 때는:
 
 ```
 POST http://127.0.0.1:8799/api/event     X-Sidekick-Token: <events.token>
 {"type": "sigh"}            (선택: "n": 3)       type은 sigh | pushup | dishes
 ```
-sidekick(또는 폰 페이지)이 한숨을 감지했을 때 위 주소로 보내면 됩니다. sidekick 쪽의 전달 코드는 TODO입니다.
 
 ## 설정 팁
 - `games`, `work_apps`: 프로세스 이름(`.exe` 유무/대소문자 무관). 작업관리자 → 세부 정보에서 확인

@@ -1,7 +1,7 @@
 # 결정해주는 데스크톱 펫 (decision-pet)
 
 결정 장애가 있는 Claude Code 헤비 유저를 위한 작은 데스크톱 펫입니다.
-화면 구석에 앉아서 **"오늘은 이거 해"** 라고 말해 줍니다. Python 3.9+ (3.12에서 검증) 표준 라이브러리(tkinter)만 사용합니다.
+화면 구석에 앉아서 **"오늘은 이거 해"** 라고 말해 줍니다. Python 3.12+ (3.12에서 검증) 표준 라이브러리(tkinter)만 사용합니다.
 
 ## 컨셉
 
@@ -125,6 +125,8 @@ python -m decision_pet lunch --no-anim                                    # 애�
 ## 데이터와 설정
 
 저장 위치: `%APPDATA%\decision-pet` (없으면 `~/.decision-pet`). 환경변수 `DECISION_PET_HOME`으로 변경할 수 있습니다.
+
+LLM 주소는 환경변수 `DECISION_PET_LLM_URL` 이 있으면 그것, 없으면 `state.json` 의 `llm.endpoint`, 그것도 없으면 `http://localhost:1234/v1` 을 씁니다.
 
 - `state.json` — 할 일, 결정 기록, 점심 후보/기록, 설정
 - `experiments.txt` — 오늘의 실험 목록. `experiment` 명령을 한 번 실행하면 기본 20개로 만들어집니다. 한 줄에 하나, `#` 시작은 주석. 이 파일을 고치면 목록이 바뀝니다.

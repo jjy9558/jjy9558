@@ -19,7 +19,7 @@ S21이 듣고 보면  ──▶  PC가 판단  ──▶  S21이 말하거나 / 
 | 매크로 패드 | 큰 버튼 격자(또는 NFC 태그)를 누른다 | config에 미리 적어 둔 프로그램 실행·URL 열기·키 입력·텍스트 입력만 한다 |
 | rm -rf 결재 보고 | "사장님, ... 해도 되겠습니까?" → 승인/반려 (버튼·음성) | Claude Code 훅이 위험 명령을 결재가 날 때까지 붙잡는다 |
 
-- PC: Python 3.9+, **표준 라이브러리만** (PC 음성 인식을 원할 때만 `faster-whisper` 선택 설치)
+- PC: Python 3.12+, **표준 라이브러리만** (PC 음성 인식을 원할 때만 `faster-whisper` 선택 설치)
 - 폰: Chrome에서 여는 HTML 한 장 (빌드 없음). 음성 인식은 기본적으로 **폰 브라우저의 Web Speech API(ko-KR)**, 말하기는 `speechSynthesis`
 
 ## 1. PC 설정

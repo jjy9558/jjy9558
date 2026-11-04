@@ -2,7 +2,7 @@
 
 Windows + Steam 게이머가 **로컬 비전 모델(llama-server + VLM, OpenAI 호환)** 로 스크린샷에 캡션을 달고,
 게임·세션별 한국어 일기(Markdown)와 정적 HTML 앨범을 만드는 도구입니다.
-Python 3.9+ 표준 라이브러리만 사용하며, 외부 네트워크·프록시를 쓰지 않습니다.
+Python 3.12+ 표준 라이브러리만 사용하며, 외부 네트워크·프록시를 쓰지 않습니다.
 
 ## 개인정보 안내
 - 스크린샷에는 **채팅, 사용자 이름** 등이 찍혀 있을 수 있습니다.
@@ -19,7 +19,7 @@ python -m gamediary scan
 python -m gamediary caption --limit 50
 python -m gamediary diary            # 오늘 일기
 python -m gamediary diary --week     # 이번 주 일기
-python -m gamediary album            # out/album.html
+python -m gamediary album            # ~/.gamediary/out/album.html
 ```
 llama-server 예: `llama-server -m model.gguf --mmproj mmproj.gguf --port 8080`
 
@@ -33,6 +33,8 @@ llama-server 예: `llama-server -m model.gguf --mmproj mmproj.gguf --port 8080`
 | `album [--embed-thumbs]` | `out/album.html` |
 
 공통 옵션 `--config 경로` (기본 `~/.gamediary/config.json`, 환경변수 `GAMEDIARY_CONFIG`).
+
+아래 표의 `out/` 은 설정 `out_dir` 폴더를 뜻하며 기본값은 `~/.gamediary/out` 입니다. 옛 위치 `./out/` 에 내용이 있고 설정에 `out_dir` 이 없으면 그것을 계속 쓰고 안내를 출력합니다.
 
 ## 소스
 - **Steam**: `Steam\userdata\<id>\760\remote\<appid>\screenshots\*.jpg`. userdata 또는 그 하위 아무 폴더나 지정하면 `screenshots` 폴더를 찾아 폴더명에서 appid 를 얻습니다. 게임 이름은 로컬 파일만 사용합니다: 설정의 `game_names` > `names_cache`(기본 `~/.gamediary/games.json`, `{"570": "Dota 2"}`) > `~/.steam-buddy/data.json`. 모르면 `Steam 앱 <appid>`.

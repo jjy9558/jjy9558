@@ -1,0 +1,21 @@
+{
+  "title": "homelab-e2e",
+  "project": "..",
+  "width": 84,
+  "height": 20,
+  "steps": [
+    {
+      "type": "comment",
+      "text": "# 시나리오별 준비 상태"
+    },
+    {
+      "type": "cmd",
+      "run": "python -m homelabe2e projects",
+      "show": "homelab-e2e projects"
+    },
+    {
+      "type": "pause",
+      "seconds": 1.0
+    }
+  ]
+}

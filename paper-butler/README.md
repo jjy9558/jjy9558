@@ -8,7 +8,7 @@
 <!-- demo:end -->
 
 - 모든 처리는 **내 컴퓨터 안에서만** 이루어집니다. (클라우드 전송 없음, 외부 API 호출 없음)
-- 핵심 로직은 **Python 3.9+ 표준 라이브러리만** 사용합니다. 설치할 패키지가 없습니다.
+- 핵심 로직은 **Python 3.12+ 표준 라이브러리만** 사용합니다. 설치할 패키지가 없습니다.
 - 글자 읽기(PDF/사진)는 선택 기능이며, 없어도 텍스트 붙여넣기만으로 모든 기능이 동작합니다.
 
 ```
@@ -114,7 +114,7 @@ python3 -m paperbutler refunds --days 14 --json      # 환불·반품 기한만
 python3 -m paperbutler budget set --income 2500000 --fixed 40% --living 40% --save 20%
 python3 -m paperbutler budget set --income 250만 --fixed 1000000 --living 45% --save 500000   # 금액·비율 섞어 쓰기
 python3 -m paperbutler budget show                    # 이번 달 (--month 2026-10 도 가능)
-python3 -m paperbutler budget alarm --ntfy my-topic   # cron 에 걸어 두면 비상벨
+python3 -m paperbutler budget alarm --ntfy <길고-무작위한-토픽>   # cron 에 걸어 두면 비상벨 (토픽 이름이 곧 비밀번호)
 ```
 
 ```
@@ -139,7 +139,7 @@ python3 -m paperbutler budget alarm --ntfy my-topic   # cron 에 걸어 두면 �
   저축처럼 추적하지 않는 봉투는 경보 대상이 아닙니다. 미리보기만 보려면 `--dry-run`.
 - **ntfy**: `--ntfy TOPIC` 이면 같은 문구를 푸시로도 보냅니다. 전송이 실패해도 명령은 성공(종료 코드 0)하며, 실패한 경보는
   기록하지 않아 다음 실행에서 다시 시도합니다. 푸시 본문에는 봉투 이름·퍼센트·남은 돈만 들어가고 카드/계좌 번호는 들어가지 않습니다.
-  (ntfy 전송에는 `paperbutler/_jjkit/notify.py` 를 쓰며 Python 3.10+ 가 필요합니다. 나머지 기능은 그대로 3.9+ 입니다.)
+  (ntfy 전송에는 `paperbutler/_jjkit/notify.py` 를 씁니다.)
 - **`budget alarm --json`**: `due --json` 과 별개의 스키마입니다(`paperbutler/contract.py` 의 `BUDGET_VERSION`, `validate_budget`).
   기존 `SCHEMA_VERSION` 과 `due`/`refunds` 출력은 바뀌지 않았습니다.
 

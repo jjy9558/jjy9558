@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "homelab-e2e"
+version = "0.1.0"
+description = "프로젝트끼리 실제로 말이 통하는지 확인하는 교차 프로젝트 종단 간(e2e) 통합 테스트"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+homelab-e2e = "homelabe2e.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["homelabe2e", "homelabe2e.*"]

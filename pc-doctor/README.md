@@ -1,7 +1,9 @@
 # C5 PC 닥터 (pc-doctor)
 
 직접 조립한 게임/로컬 AI PC(예: RTX 5080, 대용량 RAM, BIOS·RAM 자주 만지는 사람, llama.cpp 사용자)를 위한
-**Windows 11 전용 명령줄 도구**입니다. Python 3.9+ 표준 라이브러리만 씁니다.
+**Windows 11 전용 명령줄 도구**입니다. Python 3.12+ 표준 라이브러리만 씁니다.
+
+Windows 가 아닌 PC에서 실시간 점검 명령(`snapshot`, `check`, `updates`, `tweaks list` 등)을 실행하면 "윈도우 전용 점검입니다" 와 함께 종료 코드 3 으로 끝납니다. '문제 없음'으로 판단하지 않습니다. 저장된 스냅샷을 `--snapshot <파일>` 로 지정하면 Windows 가 아니어도 점검할 수 있습니다.
 
 | 기능 | 명령 | 하는 일 |
 |---|---|---|

@@ -87,7 +87,7 @@ python -m sellstudio ledger report --csv 장부.csv --json 장부.json
 
 ## 되팔이 장부
 
-- 장부 파일: 기본 `./sell-ledger.json`(`--ledger` 또는 `SELLSTUDIO_LEDGER`). 금액은 `150000`, `15만`, `12.5만`, `850k` 형태.
+- 장부 파일: 기본 `~/.sell-studio/sell-ledger.json` (`--ledger` 또는 `SELLSTUDIO_LEDGER` 가 우선; 옛 위치 `./sell-ledger.json` 이 이미 있으면 그것을 씁니다). 금액은 `150000`, `15만`, `12.5만`, `850k` 형태.
 - ID 는 이름+매입가로 정해지므로 같은 `add` 를 다시 실행해도 중복되지 않습니다. 같은 이름·매입가인 물건이 둘 이상이면 `--id` 로 구분하세요.
 - `sold` 는 판매 처리된 건에 날짜를 생략하면 기존 판매일을 유지합니다(멱등). 수수료는 `--fee` 금액, `--fee-rate` 퍼센트, `--market`(설정의 근사 수수료율) 순으로 씁니다.
 - `report --csv` 는 엑셀에서 한글이 깨지지 않게 UTF-8 BOM 으로 씁니다.

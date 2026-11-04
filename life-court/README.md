@@ -11,10 +11,11 @@ Python 3.12 이상, 외부 패키지 없음. 폴더에서 바로 실행합니다
 
 ```
 cd life-court
-python -m lifecourt hello
+python -m lifecourt --help                                  # 명령 목록
+python -m lifecourt toast 민수:개발자 --occasion 송년회      # 건배사 (저장 안 함)
 ```
 
-선택: `pip install .` 하면 `life-court hello` 처럼 쓸 수 있습니다.
+선택: `pip install .` 하면 `life-court toast 민수:개발자 --occasion 송년회` 처럼 쓸 수 있습니다.
 
 ## 사용 예
 
@@ -23,7 +24,7 @@ life-court night-snack --food 치킨 --time 23:40 --kcal 1200 --count 2   # 야�
 life-court late --consent --minutes 25 --meeting "금요 저녁" --excuse "버스가 안 와서"
 life-court bet --a 민수 --b 지연 --condition "축구 승부 예측" --winner 민수 --stake 커피 --complaint "심판이 편파였다"
 life-court toast 민수:개발자 지연 --occasion 송년회
-life-court wakeup --db ~/sound-watch/data/soundwatch.db --woke 03:40   # 누가 날 깨웠나 재판
+life-court wakeup --woke 03:40          # 누가 날 깨웠나 재판 (sound-watch DB 자동 탐색)
 life-court forget --who 철수          # 저장된 지각 기록 지우기 (--night, --late도 가능)
 ```
 
@@ -35,7 +36,7 @@ life-court forget --who 철수          # 저장된 지각 기록 지우기 (--n
 - **bet**: 두 사람, 조건, 결과로 판결문과 항소 기각 문구를 만듭니다. 아무것도 저장하지 않습니다.
 - **toast**: 이름(`이름:직업`)으로 건배사 5개를 만듭니다. 아무것도 저장하지 않습니다.
 
-- **wakeup**: "누가 날 깨웠나 재판". sound-watch의 sqlite를 **읽기 전용**(`mode=ro`)으로 열어 밤 시간대(기본 오늘 00:00~07:00, `--from/--to`, 시작이 끝보다 늦으면 자정을 넘는 창)의 소음 이벤트와 인식 기록(세탁기·초인종·노크 등)을 모으고, 가장 크고 긴 소리(또는 `--woke HH:MM`에 가장 가까운 소리)를 주범으로 판결문을 씁니다. `--db` 기본값은 `$SOUNDWATCH_HOME/soundwatch.db`(없으면 `./data/soundwatch.db`). 아무것도 저장하지 않고 sound-watch 기록은 바꾸지 않습니다.
+- **wakeup**: "누가 날 깨웠나 재판". sound-watch의 sqlite를 **읽기 전용**(`mode=ro`)으로 열어 밤 시간대(기본 오늘 00:00~07:00, `--from/--to`, 시작이 끝보다 늦으면 자정을 넘는 창)의 소음 이벤트와 인식 기록(세탁기·초인종·노크 등)을 모으고, 가장 크고 긴 소리(또는 `--woke HH:MM`에 가장 가까운 소리)를 주범으로 판결문을 씁니다. `--db` 기본값은 `$SOUNDWATCH_HOME/soundwatch.db` → (옛 위치) `./data/soundwatch.db` → `~/.soundwatch/soundwatch.db` 순서로 찾습니다. 아무것도 저장하지 않고 sound-watch 기록은 바꾸지 않습니다.
   - 피고는 **소리뿐**입니다. 사람·이웃·집을 가리키는 말(옆집, 아저씨 등)이 소리 이름에 섞여 있으면 "정체불명의 소음"으로 바꾸고, 이 판결문으로 누구에게도 따지지 말라는 유의 문구를 붙입니다.
   - 증거의 dBFS는 보정하지 않은 **상대값**입니다(실제 소음계 dB과 다름). 소리끼리 비교용으로만 보세요.
   - 기록이 없는 밤은 "무혐의"(마이크가 켜져 있었는지 확인하라는 처방)로 끝납니다. `--llm`은 wakeup에서 무시됩니다(템플릿 문장만 사용).

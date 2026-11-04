@@ -10,15 +10,17 @@ S21 (마이크) ── 16 kHz Int16 PCM, 1초마다 POST ──▶ PC (sound-wat
 
 - **(a) 소리 이벤트 알림**: 세탁기/건조기 종료 멜로디, 밥솥 완료음, 초인종, 노크(택배), 전자레인지 '띵', 끓는 주전자 휘파람. 내 집 소리를 **한 번 녹음해 등록**하면(템플릿) 그 소리가 날 때 폰/PC로 알려줍니다. 범용 노크 감지기와 삐/멜로디 감지기도 있습니다.
 - **(b) 층간소음 로그**: 100 ms마다 A-가중 레벨을 재서 기준을 넘는 구간을 시각·지속시간·대략의 dB(A)상당 값으로 기록하고, **증거 스타일 리포트**(일/주 표, 타임라인, 야간 22–06시 건수, 상위 이벤트)를 만듭니다.
-- Python 3.9+ **표준 라이브러리만**으로 동작합니다. numpy가 있으면 FFT만 빨라집니다(선택, 없어도 모든 기능 동일).
+- Python 3.12+ **표준 라이브러리만**으로 동작합니다. numpy가 있으면 FFT만 빨라집니다(선택, 없어도 모든 기능 동일).
 - 이 도구의 측정값은 **교정된 소음계가 아닙니다.** 아래 [측정의 한계](#측정의-한계와-공식-절차)를 꼭 읽어 주세요.
 
 ## 빠른 시작 (윈도우 PowerShell 기준, 맥/리눅스는 `python3`)
 
 ```powershell
 cd sound-watch
-python -m soundwatch serve            # 처음 실행하면 data\config.json 과 무작위 토큰을 만들고 접속 주소를 보여 줍니다
+python -m soundwatch serve            # 처음 실행하면 %USERPROFILE%\.soundwatch\config.json 과 무작위 토큰을 만들고 접속 주소를 보여 줍니다
 ```
+
+데이터 폴더 기본값은 `%USERPROFILE%\.soundwatch` 입니다. 환경변수 `SOUNDWATCH_HOME` 또는 `--data-dir` 로 바꿀 수 있고, 옛 위치 `.\data` 에 기록이 이미 있으면 그것을 씁니다.
 
 콘솔에 이런 줄이 나옵니다.
 
@@ -65,7 +67,7 @@ python -m soundwatch analyze test.wav --json
 
 ## 2. 알림 설정
 
-`data\config.json` (처음 `serve` 때 생성, 일부만 적어도 나머지는 기본값):
+`%USERPROFILE%\.soundwatch\config.json` (처음 `serve` 때 생성, 일부만 적어도 나머지는 기본값):
 
 ```json
 {
@@ -114,7 +116,7 @@ $env:NTFY_TOKEN = "..."; $env:SIDEKICK_TOKEN = "..."; python -m soundwatch serve
 
 - 기준(`noise.threshold_db`, 기본 50 — **보정 전에는 상대값**) 이상이 `min_duration_ms`(300ms) 이상 이어지면 이벤트,
 - `merge_gap_ms`(2초) 이내의 가까운 이벤트는 하나로 병합(발소리 연속 등), 내려올 때는 `hysteresis_db`(2 dB) 만큼 낮아야 종료,
-- 이벤트마다 시작 시각·지속시간·최고 레벨(100 ms 프레임 최대)·구간 Leq·자동 구분(충격성/지속성 추정)을 sqlite(`data\soundwatch.db`)에 저장하고, **분 단위 집계**(1분 Leq, 측정 시간)도 저장합니다. 측정 시간 기록 덕분에 "이벤트 0건"과 "측정 안 함"을 구분할 수 있습니다.
+- 이벤트마다 시작 시각·지속시간·최고 레벨(100 ms 프레임 최대)·구간 Leq·자동 구분(충격성/지속성 추정)을 sqlite(`%USERPROFILE%\.soundwatch\soundwatch.db`)에 저장하고, **분 단위 집계**(1분 Leq, 측정 시간)도 저장합니다. 측정 시간 기록 덕분에 "이벤트 0건"과 "측정 안 함"을 구분할 수 있습니다.
 
 ```powershell
 python -m soundwatch analyze 어젯밤.wav --log --start "2026-11-01 22:00"   # 이미 있는 녹음을 기록에 넣기
@@ -122,7 +124,7 @@ python -m soundwatch analyze 어젯밤.wav --log --start "2026-11-01 22:00"   # 
 
 ### 클립 저장 (기본 꺼짐, 선택)
 
-`config.json`의 `clips.enabled: true`로 켜면 이벤트 앞뒤 3초(최대 30초)를 `data\clips\*.wav`로 저장하고 리포트 표에 파일명을 적습니다.
+`config.json`의 `clips.enabled: true`로 켜면 이벤트 앞뒤 3초(최대 30초)를 `%USERPROFILE%\.soundwatch\clips\*.wav`로 저장하고 리포트 표에 파일명을 적습니다.
 
 - **개인정보/법**: 다른 사람의 대화를 동의 없이 녹음하는 것은 법적 문제가 될 수 있습니다. 켜기 전에 관련 법령과 공동주택 규약을 직접 확인하세요. 이 설정은 법률 자문이 아닙니다.
 - 완화 장치: ① 기본 꺼짐(레벨만 기록) ② `skip_speech`(기본 true): 말소리처럼 보이는 클립은 저장하지 않음 — **휴리스틱이라 완전하지 않습니다** ③ `lowpass_hz`(기본 500): 4차 저역통과로 대화 내용을 알아듣기 어렵게 함(쿵쿵 같은 저주파 충격음은 남음) ④ `retention_days`(기본 14일) 지난 클립은 서버 시작 시와 1시간마다 삭제, 수동은 `python -m soundwatch purge --days 7`.
@@ -152,7 +154,7 @@ python -m soundwatch report --days 30
 python -m soundwatch report --from 2026-10-01 --to 2026-10-31 --out 10월.html
 ```
 
-`data\reports\report_YYYYMMDD_YYYYMMDD.html` 과 `_events.csv`, `_daily.csv`(UTF-8 BOM, 엑셀에서 바로 열림)를 만듭니다.
+`%USERPROFILE%\.soundwatch\reports\report_YYYYMMDD_YYYYMMDD.html` 과 `_events.csv`, `_daily.csv`(UTF-8 BOM, 엑셀에서 바로 열림)를 만듭니다.
 
 HTML은 **단일 파일**(인라인 SVG/CSS, 외부 요청·스크립트 없음)이고 라이트/다크와 인쇄를 지원합니다. 내용: 요약 · 측정 설정/보정 상태 · 일별 표(측정 시간, 이벤트, 야간, 최고, 최대 1분 Leq, 1분 Leq 중앙값) · 주별(ISO 주) 표 · 일별 24시간 타임라인(빗금 = 측정 안 된 시간) · 이벤트별 최고 레벨 분포 · 시간대별 분포 · 일별 건수 · **야간(22:00–06:00) 건수와 목록** · 상위 이벤트 · 전체 목록 · **측정의 한계** · 데이터 지문(이벤트 CSV 해시).
 야간 구분은 이벤트 **시작 시각**이 `night.start`~`night.end`(자정 넘김 지원, 기본 22:00–06:00)인지로 봅니다. 시간대는 `utc_offset_minutes`(기본 540 = 한국).
@@ -212,4 +214,4 @@ python -m unittest discover -s tests -v          # 약 25초(numpy 없이도 약
 
 - 서버 기본 바인딩은 `127.0.0.1`, 모든 `/api/*`는 토큰 필요(상수 시간 비교), 본문 크기 제한, 미인증 요청 본문은 읽지 않음.
 - 기본적으로 **오디오를 저장하지 않고** 레벨·이벤트 메타데이터만 기록합니다. 외부로 나가는 요청은 직접 켠 ntfy/sidekick 알림뿐이며, 알림에는 소리 이름과 문구만 들어갑니다(오디오 없음).
-- `data\config.json`에는 서버 토큰이 있습니다(가능하면 파일 권한 0600). 공유/커밋하지 마세요.
+- `%USERPROFILE%\.soundwatch\config.json`에는 서버 토큰이 있습니다(가능하면 파일 권한 0600). 공유/커밋하지 마세요.

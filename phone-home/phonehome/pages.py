@@ -53,6 +53,7 @@ margin:0 0 14px;box-shadow:0 2px 0 rgba(0,0,0,.25),0 8px 22px rgba(0,0,0,.25);ov
 .paper .due.hot{color:var(--stamp)}
 .paper .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .paper button,.paper .btn{min-height:48px}
+.paper .atext{font-size:.85rem;opacity:.7;align-self:center}
 .paper .btn.ghost,.paper button.ghost{background:rgba(0,0,0,.08);color:var(--ink)}
 .paper.done{opacity:.72}
 .stamp{position:absolute;right:18px;bottom:14px;width:96px;height:96px;border:5px solid var(--stamp);border-radius:50%;
@@ -192,7 +193,7 @@ function renderPile(s){var box=$("pile");box.textContent="";
    else if(a.runnable){var b=el("button","ghost","▶ "+a.label);b.onclick=function(){b.disabled=true;
     api("/desk/api/action",{action:a.id,key:c.key}).then(function(j){toast((j.ok?"완료: ":"실패: ")+(j.output||a.label))},
     function(e){toast("실패: "+e.message)}).then(function(){b.disabled=false})};row.appendChild(b)}
-   else{var g=el("button","ghost",a.label);g.disabled=true;g.title="허용 목록에 없는 action";row.appendChild(g)}});
+   else{var g=el("span","atext",a.label);g.title=a.text?"안내 문구":"허용 목록에 없는 action";row.appendChild(g)}});
   var ok=el("button","ok","확인"),no=el("button","bad","반려");
   ok.onclick=function(){stamp(c,"ok",p)};no.onclick=function(){stamp(c,"reject",p)};row.appendChild(ok);row.appendChild(no);
   p.appendChild(row);if(c.stamp)p.appendChild(stampEl(c.stamp));box.appendChild(p)})}

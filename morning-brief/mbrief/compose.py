@@ -32,6 +32,14 @@ def effective(item: Item, cfg: dict, quiet: bool) -> float:
     return round(item.priority * w, 1)
 
 
+def action_out(a):
+    """카드 action. 문자열은 표시 전용 문장, dict 은 {id,label,text}(id 는 실행 키, text 는 사람이 읽는 문장)."""
+    if isinstance(a, dict):
+        label = str(a["label"])
+        return {"id": str(a["id"]), "label": label, "text": str(a.get("text") or label)}
+    return str(a)
+
+
 def due_key(due: str | None) -> tuple:
     if not due:
         return (1, "")
@@ -127,6 +135,7 @@ def compose(items: list[Item], statuses: dict, titles: dict, cfg: dict, ctx: Con
     brief = {
         "version": SCHEMA_VERSION,
         "date": ctx.today.isoformat(),
+        "tz": ctx.now.strftime("%z")[:3] + ":" + ctx.now.strftime("%z")[3:],
         "quiet_day": quiet,
         "speak_text": text,
         "reject_text": str(cfg["reject_text"]),
@@ -135,7 +144,7 @@ def compose(items: list[Item], statuses: dict, titles: dict, cfg: dict, ctx: Con
         "sections": list(sections.values()),
         "sources": statuses,
     }
-    cards = [{"kind": it.kind, "title": it.title, "detail": it.detail, "due": it.due, "actions": list(it.actions)}
+    cards = [{"kind": it.kind, "title": it.title, "detail": it.detail, "due": it.due, "actions": [action_out(a) for a in it.actions]}
              for it, p in sorted(((i, p) for i, p in ranked if i.card),
                                  key=lambda t: (due_key(t[0].due), -t[1], t[0].title))]
     return Composed(brief, cards, ranked, spoken, budget)

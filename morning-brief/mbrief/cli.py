@@ -17,7 +17,7 @@ from typing import TextIO
 from . import __version__
 from . import compose as C
 from . import contract, deliver, render, runner
-from .config import ConfigError, find_config, load_config
+from .config import ConfigError, find_config, load_config, timezone_spec
 from .model import Context
 
 
@@ -44,16 +44,19 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def make_context(args, cfg: dict, base: Path, *, opener=None, clock=None, env=None) -> Context:
-    tz = dt.timezone(dt.timedelta(minutes=int(cfg["tz_offset_minutes"])))
+    tz = timezone_spec(cfg)          # None 이면 이 PC 의 로컬 시각대(기본)
     if args.date:
         try:
             day = dt.date.fromisoformat(args.date)
         except ValueError:
             raise ConfigError("--date 는 YYYY-MM-DD 형식이어야 해요: %s" % args.date)
         hh, mm = (int(x) for x in str(cfg["default_time"]).split(":"))
-        now = dt.datetime(day.year, day.month, day.day, hh, mm, tzinfo=tz)
+        if tz is None:
+            now = dt.datetime(day.year, day.month, day.day, hh, mm).astimezone()   # 그 날짜의 로컬 오프셋(DST 반영)
+        else:
+            now = dt.datetime(day.year, day.month, day.day, hh, mm, tzinfo=tz)
     else:
-        now = (clock() if clock else dt.datetime.now(tz)).astimezone(tz)
+        now = (clock() if clock else dt.datetime.now(dt.timezone.utc)).astimezone(tz)
     kw = {} if env is None else {"env": env}
     return Context(now=now, base_dir=base, dry_run=bool(args.dry_run), opener=opener, **kw)
 

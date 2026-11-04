@@ -1,5 +1,5 @@
 {
-  "tz_offset_minutes": 540,
+  "timezone": "local",
   "out_dir": "out",
   "reject_text": "일어나면 해 드립니다",
   "speak": {"seconds": 60, "chars_per_sec": 5.0, "max_chars": 300, "intro": true},

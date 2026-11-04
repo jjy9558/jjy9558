@@ -2,7 +2,8 @@
 
 - 카드: morning-brief 계약 파일 ``out/cards-latest.json`` (``[{kind,title,detail,due,actions[]}]``).
   파일이 없거나 깨져도 빈 더미. "확인/반려" 도장은 ``desk-log.jsonl``에 한 줄 기록만 한다.
-- action 실행: 설정 ``desk.actions`` 화이트리스트에 있는 것만(셸 없이 argv). 기본은 빈 목록.
+- action: 문자열은 표시 전용 문장, ``{"id","label"}`` 객체만 버튼 후보. id 가 설정 ``desk.actions`` 화이트리스트
+  (정확한 id 또는 ``"paperbutler.done:"`` 같은 접두사 + 검증된 인자 하나)에 맞을 때만 실행(셸 없이 argv). 기본은 빈 목록.
 - 결재: s21-sidekick ``GET /api/approval/pending``, jarvis-hub ``GET /api/jobs?status=waiting_approval``.
   승인/반려는 해당 서비스 API로만 보낸다. ``link_only_patterns``에 걸리는 위험 결재는 버튼 없이 링크만.
 """
@@ -21,6 +22,9 @@ STAMPS = {"ok": "확인", "reject": "반려"}
 KEY_RE = re.compile(r"^[0-9a-f]{12}$")
 SIDEKICK_ID_RE = re.compile(r"^[0-9a-f]{1,32}$")
 JARVIS_ID_RE = re.compile(r"^\d{1,12}$")
+# 접두사 화이트리스트("paperbutler.done:")에서 접미사로 받을 수 있는 인자 형식
+ARG_PATTERNS = {"digits": re.compile(r"[0-9]{1,12}"), "slug": re.compile(r"[A-Za-z0-9_-]{1,64}")}
+ARG_PLACEHOLDER = "{arg}"
 
 
 class DeskError(Exception):
@@ -55,9 +59,34 @@ def due_sort_key(due: str):
         return (1, due)
 
 
+def resolve_action(allowed: dict, action_id) -> tuple[dict, list[str]] | None:
+    """(스펙, 실행 argv) 또는 None. 정확히 같은 id 가 우선, 아니면 ':' 로 끝나는 접두사 항목.
+    접두사 항목은 접미사 전체가 인자 형식(기본 digits)에 맞아야 하고 argv 의 "{arg}" 자리에 통째로(한 인자로) 들어간다."""
+    if not isinstance(action_id, str) or not action_id or not isinstance(allowed, dict):
+        return None
+    spec = allowed.get(action_id)
+    if isinstance(spec, dict) and not action_id.endswith(":"):
+        return spec, list(spec["argv"])
+    best = None
+    for key, sp in allowed.items():
+        if isinstance(key, str) and key.endswith(":") and isinstance(sp, dict) and action_id.startswith(key) \
+                and (best is None or len(key) > len(best[0])):
+            best = (key, sp)
+    if best is None:
+        return None
+    key, sp = best
+    arg = action_id[len(key):]
+    pat = ARG_PATTERNS.get(sp.get("arg") or "digits")
+    if pat is None or not pat.fullmatch(arg):
+        return None
+    return sp, [arg if x == ARG_PLACEHOLDER else x for x in sp["argv"]]
+
+
 def _norm_action(a) -> dict | None:
     if isinstance(a, str):
-        a = {"id": a}
+        # 문자열은 표시 전용 문장(계약 호환). 실행 id 로 해석하지 않는다.
+        label = _s(a, 120).strip()
+        return {"id": "", "label": label, "url": "", "text": True} if label else None
     if not isinstance(a, dict):
         return None
     aid = _s(a.get("id") or a.get("action") or "", 64)
@@ -151,7 +180,7 @@ class Desk:
         for c in cards:
             c["stamp"] = stamped.get(c["key"], "")
             for a in c["actions"]:
-                a["runnable"] = bool(a["id"]) and a["id"] in allowed
+                a["runnable"] = bool(a["id"]) and not a.get("text") and resolve_action(allowed, a["id"]) is not None
         return cards, status
 
     def stamp(self, key: str, stamp: str) -> dict:
@@ -168,13 +197,14 @@ class Desk:
 
     def run_action(self, action_id: str, key: str = "") -> dict:
         allowed = self.cfg.get("actions") or {}
-        if not isinstance(action_id, str) or action_id not in allowed:
+        resolved = resolve_action(allowed, action_id)
+        if resolved is None:
             self.log({"type": "action", "action": _s(action_id, 64), "key": _s(key, 12), "result": "forbidden"})
             raise DeskError(403, "허용 목록에 없는 action입니다")
-        spec = allowed[action_id]
+        spec, argv = resolved
         timeout = float(spec.get("timeout") or self.cfg.get("action_timeout") or 20)
         try:
-            r = self.runner(list(spec["argv"]), shell=False, capture_output=True, timeout=timeout,
+            r = self.runner(argv, shell=False, capture_output=True, timeout=timeout,
                             text=True, encoding="utf-8", errors="replace")
             rc, out = r.returncode, ((r.stdout or "") + (r.stderr or "")).strip()
         except subprocess.TimeoutExpired:

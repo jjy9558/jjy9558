@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from helpers import FakeOpener, NOW, TOKEN, World, jarvis_status
+from helpers import FakeOpener, NOW, TOKEN, World, jarvis_status, pb_done
 from mbrief.model import SourceMissing, SourceSkip
 from mbrief.runner import source_cfg
 from mbrief.sources import BY_NAME
@@ -73,14 +73,14 @@ class SourceTests(unittest.TestCase):
         self.assertEqual(gas.due, "2026-11-04")
         self.assertIn("모레", gas.speak)
         self.assertIn("3만 2천 4백원", gas.speak)
-        self.assertEqual(gas.actions, ("완료 처리: python -m paperbutler done 1",))
+        self.assertEqual(gas.actions, (pb_done(1),))
         elec = next(i for i in bills if "전기" in i.title)
         self.assertIn("자동이체", elec.speak)
         self.assertLess(elec.priority, 90)               # 자동이체는 조금 낮춘다
         refunds = [i for i in items if i.kind == "refund"]
         self.assertEqual(len(refunds), 1)                # 이미 지난 환불 기한은 제외
         self.assertIn("쿠팡", refunds[0].title)
-        self.assertEqual(refunds[0].actions, ("완료 처리: python -m paperbutler done 5",))
+        self.assertEqual(refunds[0].actions, (pb_done(5),))
 
     def test_voice_journal(self):
         items = self.run_source("voice_journal")

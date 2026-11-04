@@ -4,7 +4,7 @@ import subprocess
 import unittest
 from pathlib import Path
 
-from phonehome.desk import card_key, due_sort_key, load_cards
+from phonehome.desk import card_key, due_sort_key, load_cards, resolve_action
 
 from helpers import FakeBackend, Harness, dead_url, fake_token
 
@@ -103,7 +103,8 @@ class DeskTests(unittest.TestCase):
         self.assertEqual(titles, ["로스트아크 점검", "가스비 납부", "넷플릭스 갱신", "마감 없는 메모"])
         gas = snap["cards"][1]
         self.assertEqual(gas["actions"][0]["url"], "/s/sidekick/")
-        self.assertFalse(gas["actions"][1]["runnable"])  # mark-paid는 화이트리스트에 없음
+        self.assertFalse(gas["actions"][1]["runnable"])  # 문자열 action 은 표시 전용
+        self.assertTrue(gas["actions"][1]["text"])
         self.assertTrue(snap["cards"][2]["actions"][0]["runnable"])
 
     def test_stamp_logs_only(self):
@@ -226,6 +227,138 @@ class CardUnitTests(unittest.TestCase):
         self.assertEqual(keys, ["2026-11-03T09:00", "2026-11-05", "아무때나", ""])
         self.assertEqual(card_key("a", "b", "c"), card_key("a", "b", "c"))
         self.assertNotEqual(card_key("a", "b", "c"), card_key("a", "b", "d"))
+
+
+
+
+class PrefixActionTests(unittest.TestCase):
+    ALLOWED = {"paperbutler.done:": {"label": "완료 처리", "argv": ["python3", "-m", "paperbutler", "done", "{arg}"]},
+               "cool-report": {"label": "리포트", "argv": ["echo", "hi"]}}
+
+    def setUp(self):
+        self.runner = FakeRunner()
+        self.h = Harness({}, desk={"actions": self.ALLOWED}, runner=self.runner)
+        self.cards = Path(self.h.cfg["desk"]["cards_path"])
+        self.log = Path(self.h.cfg["desk"]["log_path"])
+
+    def tearDown(self):
+        self.h.close()
+
+    def test_resolve_action(self):
+        self.assertEqual(resolve_action(self.ALLOWED, "paperbutler.done:12")[1],
+                         ["python3", "-m", "paperbutler", "done", "12"])
+        self.assertEqual(resolve_action(self.ALLOWED, "cool-report")[1], ["echo", "hi"])
+        for bad in ("paperbutler.done:", "paperbutler.done:1a", "paperbutler.done:-1", "paperbutler.done: 1",
+                    "paperbutler.done:1 2", "paperbutler.done:1;rm", "paperbutler.done:1\n", "paperbutler.done:٣",
+                    "paperbutler.done:" + "1" * 13, "paperbutler.done", "paperbutler.undo:1", "cool-report:1",
+                    "xpaperbutler.done:1", "", None, 5):
+            self.assertIsNone(resolve_action(self.ALLOWED, bad), repr(bad))
+
+    def test_string_action_is_text_even_if_whitelisted(self):
+        """문자열 action 은 id 로 해석하지 않는다: 화이트리스트와 같은 글자여도 버튼이 아니다."""
+        self.cards.write_text(json.dumps([{"kind": "x", "title": "t", "actions": ["cool-report", "읽기만 하세요"]}]),
+                              encoding="utf-8")
+        acts = self.h.json("GET", "/desk/api/items")[1]["cards"][0]["actions"]
+        self.assertEqual([(a["label"], a["runnable"], a.get("text")) for a in acts],
+                         [("cool-report", False, True), ("읽기만 하세요", False, True)])
+        self.assertEqual(self.runner.calls, [])
+
+    def test_object_action_runnable_only_when_whitelisted(self):
+        self.cards.write_text(json.dumps([{"kind": "x", "title": "t", "actions": [
+            {"id": "cool-report", "label": "리포트"}, {"id": "other", "label": "다른 것"}]}]), encoding="utf-8")
+        acts = self.h.json("GET", "/desk/api/items")[1]["cards"][0]["actions"]
+        self.assertEqual([a["runnable"] for a in acts], [True, False])
+
+    def test_prefix_card_button_and_run(self):
+        self.cards.write_text(json.dumps([{"kind": "bill", "title": "가스", "detail": "", "due": "2026-11-04", "actions": [
+            "완료 처리: python -m paperbutler done 12",
+            {"id": "paperbutler.done:12", "label": "완료 처리", "text": "완료 처리: ..."},
+            {"id": "paperbutler.done:abc", "label": "이상한 것"}]}]), encoding="utf-8")
+        card = self.h.json("GET", "/desk/api/items")[1]["cards"][0]
+        self.assertEqual([a["runnable"] for a in card["actions"]], [False, True, False])
+        code, r = self.h.json("POST", "/desk/api/action", {"action": "paperbutler.done:12", "key": card["key"]})
+        self.assertEqual((code, r["ok"]), (200, True))
+        argv, kw = self.runner.calls[0]
+        self.assertEqual(argv, ["python3", "-m", "paperbutler", "done", "12"])
+        self.assertIs(kw["shell"], False)
+
+    def test_invalid_suffix_forbidden_and_never_run(self):
+        for bad in ("paperbutler.done:abc", "paperbutler.done:1;ls", "paperbutler.done:", "paperbutler.done:$(id)",
+                    "paperbutler.done:12 13", "paperbutler.purge:1"):
+            self.assertEqual(self.h.json("POST", "/desk/api/action", {"action": bad})[0], 403, bad)
+        self.assertEqual(self.runner.calls, [])
+
+    def test_default_config_runs_nothing(self):
+        h = Harness({})
+        try:
+            self.assertEqual(h.json("POST", "/desk/api/action", {"action": "paperbutler.done:1"})[0], 403)
+        finally:
+            h.close()
+
+    def test_config_validation(self):
+        from phonehome import config as C
+        ok = C.normalize({"server": {"token": "t" * 12}, "services": {}, "desk": {"actions": self.ALLOWED}})
+        self.assertIn("paperbutler.done:", ok["desk"]["actions"])
+        for bad in ({"a.b:": {"argv": ["x"]}},                      # {arg} 없음
+                    {"a.b:": {"argv": ["x", "{arg}", "{arg}"]}},       # 둘
+                    {"a.b:": {"argv": ["x", "--id={arg}"]}},           # 인자 일부로 끼움
+                    {"a.b:": {"argv": ["x", "{arg}"], "arg": "any"}},  # 모르는 검증
+                    {"a-b": {"argv": ["x", "{arg}"]}}):                # 정확한 id 에 {arg}
+            with self.assertRaises(ValueError, msg=str(bad)):
+                C.normalize({"server": {"token": "t" * 12}, "services": {}, "desk": {"actions": bad}})
+
+
+class CrossMorningBriefTests(unittest.TestCase):
+    """morning-brief 가 실제로 만든 cards-latest.json 을 책상이 그대로 읽는다."""
+
+    def setUp(self):
+        mb = Path(__file__).resolve().parents[2] / "morning-brief"
+        if not (mb / "mbrief").is_dir():
+            self.skipTest("morning-brief 폴더가 없음")
+        import sys
+        import datetime as dt
+        sys.path.insert(0, str(mb))
+        self.addCleanup(lambda: sys.path.remove(str(mb)))
+        for m in [m for m in sys.modules if m == "mbrief" or m.startswith("mbrief.")]:
+            del sys.modules[m]
+        self.addCleanup(lambda: [sys.modules.pop(m) for m in [m for m in sys.modules if m == "mbrief" or m.startswith("mbrief.")]])
+        from mbrief import compose, contract
+        from mbrief.config import load_config
+        from mbrief.model import Context, Item
+        from mbrief.sources import paper_butler
+        cfg, _ = load_config(None)
+        ctx = Context(now=dt.datetime(2026, 11, 2, 7, 30, tzinfo=dt.timezone(dt.timedelta(hours=9))), env={})
+        items = [
+            Item("paper_butler", "bill", "서울도시가스 3만원", "납부기한", 90, "납부", "", "2026-11-04",
+                 (paper_butler.done_action(12),)),
+            Item("game_calendar", "maintenance", "점검", "", 80, "점검", "", "2026-11-02T10:00+09:00",
+                 ("공지 열기: https://notice.example/1",)),
+            Item("paper_butler", "bill", "수상한 id", "", 50, "x", "", "2026-11-05",
+                 ({"id": "paperbutler.done:1;rm -rf /", "label": "이상", "text": "이상"},))]
+        c = compose.compose(items, {}, {}, cfg, ctx)
+        self.assertEqual(contract.validate_cards(c.cards), [])
+        self.h = Harness({}, desk={"actions": {
+            "paperbutler.done:": {"label": "완료 처리", "argv": ["python3", "-m", "paperbutler", "done", "{arg}"]}}},
+            runner=FakeRunner())
+        self.addCleanup(self.h.close)
+        Path(self.h.cfg["desk"]["cards_path"]).write_text(json.dumps(c.cards, ensure_ascii=False), encoding="utf-8")
+
+    def test_desk_renders_brief_cards(self):
+        code, snap = self.h.json("GET", "/desk/api/items")
+        self.assertEqual((code, snap["cards_status"], len(snap["cards"])), (200, "ok", 3))
+        by = {c["title"]: c for c in snap["cards"]}
+        gas = by["서울도시가스 3만원"]["actions"]
+        self.assertEqual([(a["id"], a["label"], a["runnable"]) for a in gas], [("paperbutler.done:12", "완료 처리", True)])
+        notice = by["점검"]["actions"]
+        self.assertEqual([(a["runnable"], a.get("text"), a["label"]) for a in notice],
+                         [(False, True, "공지 열기: https://notice.example/1")])
+        self.assertEqual([a["runnable"] for a in by["수상한 id"]["actions"]], [False])
+        # 버튼으로 실제 실행 (가짜 runner)
+        code, r = self.h.json("POST", "/desk/api/action", {"action": "paperbutler.done:12"})
+        self.assertEqual(code, 200)
+        self.assertEqual(self.h.app.desk.runner.calls[0][0], ["python3", "-m", "paperbutler", "done", "12"])
+        self.assertEqual(self.h.json("POST", "/desk/api/action", {"action": "paperbutler.done:1;rm -rf /"})[0], 403)
+        self.assertEqual(len(self.h.app.desk.runner.calls), 1)
 
 
 if __name__ == "__main__":

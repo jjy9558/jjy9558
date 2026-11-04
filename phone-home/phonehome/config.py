@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 from ._jjkit.httpkit import generate_token
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
+ACTION_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,40}:?$")   # 끝이 ':' 이면 접두사 항목
 PLACEHOLDER = "via-phone-home"  # 프록시된 페이지가 '토큰 없음' 화면을 띄우지 않게 넣는 가짜 값(서버가 버림)
 
 # 이 폴더가 저장소 안에 있을 때 morning-brief 계약 파일 기본 위치
@@ -66,6 +67,7 @@ DEFAULTS = {
         # 이 문구가 들어간 결재는 버튼 없이 해당 서비스 화면 링크만 건다(대소문자 무시)
         "link_only_patterns": ["rm -rf", "rm -fr", "claude.task"],
         # 실행 허용 action 화이트리스트: {"id": {"label": "...", "argv": ["..."], "timeout": 20}}
+        # 접두사 항목: {"paperbutler.done:": {"argv": ["python","-m","paperbutler","done","{arg}"], "arg": "digits"}}
         "actions": {},
         "action_timeout": 20,
     },
@@ -132,11 +134,19 @@ def normalize(raw: dict | None) -> dict:
     if not isinstance(desk["actions"], dict):
         raise ValueError("desk.actions 는 객체여야 합니다")
     for aid, a in desk["actions"].items():
-        if not NAME_RE.match(str(aid)) or not isinstance(a, dict):
+        if not ACTION_ID_RE.match(str(aid)) or not isinstance(a, dict):
             raise ValueError("desk.actions.%s 형식 오류" % aid)
         argv = a.get("argv")
         if not isinstance(argv, list) or not argv or not all(isinstance(x, str) for x in argv):
             raise ValueError("desk.actions.%s.argv 는 문자열 목록이어야 합니다 (셸 문자열 불가)" % aid)
+        slots = argv.count("{arg}")
+        if str(aid).endswith(":"):
+            if slots != 1 or any("{arg}" in x and x != "{arg}" for x in argv):
+                raise ValueError("desk.actions.%s: 접두사 항목의 argv 에는 \"{arg}\" 인자가 정확히 하나 필요합니다" % aid)
+            if a.get("arg", "digits") not in ("digits", "slug"):
+                raise ValueError("desk.actions.%s.arg 는 digits 또는 slug" % aid)
+        elif any("{arg}" in x for x in argv):
+            raise ValueError("desk.actions.%s: \"{arg}\" 는 ':' 로 끝나는 접두사 항목에서만 쓸 수 있습니다" % aid)
     for svc_name, kind in desk["approvals"].items():
         if kind not in ("sidekick", "jarvis"):
             raise ValueError("desk.approvals.%s 는 sidekick 또는 jarvis" % svc_name)

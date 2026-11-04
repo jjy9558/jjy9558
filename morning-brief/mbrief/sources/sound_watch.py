@@ -28,8 +28,12 @@ def _hhmm(s: str, default: int) -> int:
         return default
 
 
-def window(sw_cfg: dict, today: dt.date) -> tuple[float, float, dt.timezone]:
-    tz = dt.timezone(dt.timedelta(minutes=int(sw_cfg.get("utc_offset_minutes", 540))))
+def window(sw_cfg: dict, today: dt.date, default_tz: dt.tzinfo | None = None) -> tuple[float, float, dt.tzinfo]:
+    """sound-watch 설정에 utc_offset_minutes 가 있으면 그 시간대, 없으면 브리핑의 시간대(default_tz)."""
+    if "utc_offset_minutes" in sw_cfg or default_tz is None:
+        tz = dt.timezone(dt.timedelta(minutes=int(sw_cfg.get("utc_offset_minutes", 540))))
+    else:
+        tz = default_tz
     night = sw_cfg.get("night") or {}
     s, e = _hhmm(night.get("start", "22:00"), 1320), _hhmm(night.get("end", "06:00"), 360)
     day0 = dt.datetime(today.year, today.month, today.day, tzinfo=tz)
@@ -52,7 +56,7 @@ def collect(cfg: dict, ctx: Context) -> list[Item]:
             sw_cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
         except ValueError:
             sw_cfg = {}
-    t0, t1, tz = window(sw_cfg, ctx.today)
+    t0, t1, tz = window(sw_cfg, ctx.today, ctx.tz)
     cal = sw_cfg.get("calibration") or {}
     calibrated = bool(cal.get("calibrated"))
     offset = float(cfg["nominal_offset_db"]) + float(cal.get("offset_db") or 0.0)

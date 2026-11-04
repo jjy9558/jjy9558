@@ -139,6 +139,7 @@ class World:
     def config(self, **over) -> dict:
         raw = {
             "out_dir": str(self.out),
+            "timezone": "+09:00",          # 픽스처가 KST 기준이라 고정 (기본은 PC 로컬)
             "notify": {"sidekick": {"url": "http://127.0.0.1:8765", "token": TOKEN},
                        "ntfy": {"topic": "t-" + "z" * 8, "server": "https://ntfy.example"}},
             "sources": {
@@ -164,3 +165,9 @@ class World:
         kw.setdefault("base_dir", self.root)
         kw.setdefault("env", {})
         return Context(**kw)
+
+
+def pb_done(doc_id: int) -> dict:
+    """paper_butler 어댑터가 내는 '완료 처리' action 객체."""
+    return {"id": "paperbutler.done:%d" % doc_id, "label": "완료 처리",
+            "text": "완료 처리: python -m paperbutler done %d" % doc_id}

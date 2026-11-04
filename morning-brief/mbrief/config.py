@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import copy
+import datetime as dt
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +14,7 @@ HARD_MAX_CHARS = 300          # 계약: speak_text 상한 (WP18 알람 게이트
 
 # 어댑터 이름 -> 기본 가중치. 주말(조용한 날)에는 quiet_days.weights 를 곱한다.
 DEFAULTS: dict[str, Any] = {
-    "tz_offset_minutes": 540,
+    "timezone": "local",                   # "local"(이 PC 시각대) | "+09:00" | "UTC" | IANA 이름("Asia/Seoul")
     "default_time": "07:30",               # --date 로 날짜만 줄 때 쓰는 가상의 '지금'
     "out_dir": "out",
     "reject_text": "일어나면 해 드립니다",
@@ -47,6 +49,39 @@ class ConfigError(Exception):
     pass
 
 
+_OFFSET_RE = re.compile(r"^(?:UTC|GMT)?\s*([+-])(\d{1,2})(?::?(\d{2}))?$", re.I)
+
+
+def parse_timezone(spec) -> dt.tzinfo | None:
+    """설정 값 -> tzinfo. None 은 '이 PC 의 로컬 시각대'(날짜마다 DST 를 따름)."""
+    if spec is None or str(spec).strip().lower() in ("", "local"):
+        return None
+    s = str(spec).strip()
+    if s.upper() in ("UTC", "GMT", "Z"):
+        return dt.timezone.utc
+    m = _OFFSET_RE.match(s)
+    if m:
+        h, mi = int(m.group(2)), int(m.group(3) or 0)
+        if h > 23 or mi > 59:
+            raise ConfigError("timezone 오프셋 범위 오류: %s" % s)
+        return dt.timezone((1 if m.group(1) == "+" else -1) * dt.timedelta(hours=h, minutes=mi))
+    try:
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+    except ImportError:
+        raise ConfigError("timezone 이름(%s)을 쓰려면 zoneinfo 가 필요해요. \"local\" 또는 \"+09:00\" 형식을 쓰세요" % s)
+    try:
+        return ZoneInfo(s)
+    except (ZoneInfoNotFoundError, ValueError, OSError):
+        raise ConfigError("알 수 없는 timezone: %s (\"local\", \"+09:00\", IANA 이름 중 하나)" % s)
+
+
+def timezone_spec(cfg: dict):
+    """cfg 의 시각대 지정. 예전 tz_offset_minutes 는 timezone 을 안 적었을 때만 따른다(호환)."""
+    if "tz_offset_minutes" in cfg and not cfg.get("timezone_explicit"):
+        return dt.timezone(dt.timedelta(minutes=int(cfg["tz_offset_minutes"])))
+    return parse_timezone(cfg.get("timezone"))
+
+
 def find_config(explicit: str | None, env: dict | None = None, cwd: Path | None = None) -> Path | None:
     """--config > $MBRIEF_CONFIG > ./mbrief.json. 없으면 None(기본값으로 진행)."""
     env = os.environ if env is None else env
@@ -76,7 +111,10 @@ def load_config(path: Path | None) -> tuple[dict, Path]:
         if not isinstance(raw, dict):
             raise ConfigError("설정 파일은 JSON 객체여야 해요")
         cfg = deep_merge(cfg, raw)
+        cfg["timezone_explicit"] = "timezone" in raw
         base = path.resolve().parent
+    cfg.setdefault("timezone_explicit", False)
+    timezone_spec(cfg)      # 잘못된 timezone 은 여기서 ConfigError
     speak = cfg["speak"]
     speak["max_chars"] = max(20, min(int(speak.get("max_chars", HARD_MAX_CHARS)), HARD_MAX_CHARS))
     return cfg, base

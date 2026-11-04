@@ -81,12 +81,17 @@ page_storage, rewrite(기본 ["/api/"]), path_mode(prefix|passthrough), listen_p
   (`[{kind, title, detail, due, actions[]}]` 또는 `{"cards": [...]}`; 경로는 `desk.cards_path`)을 마감 빠른 순으로
   종이 더미처럼 보여 줍니다. 파일이 없거나 깨져도 빈 책상으로 200.
   "확인/반려" 도장은 `~/.phone-home/desk-log.jsonl`(`desk.log_path`)에 한 줄 기록만 하고 카드 파일은 건드리지 않습니다.
-- **action**: 카드의 `actions` 항목(문자열이면 id, 객체면 `{id, label, url}`). `url`은 같은 출처 상대경로(`/s/...`)만 링크로
-  걸고, 실행 버튼은 설정 `desk.actions` 화이트리스트에 있는 id 만 나옵니다(기본 빈 목록). 화이트리스트에 없으면 403.
+- **action**: 카드의 `actions` 항목은 **문자열(표시 전용 문장, 그냥 글자로만 보여 줌)** 또는 **`{id, label[, text, url]}` 객체**입니다
+  (morning-brief 계약과 같음). 문자열은 어떤 경우에도 실행 id 로 해석하지 않습니다. `url`은 같은 출처 상대경로(`/s/...`)만 링크로
+  걸고, 실행 버튼은 객체의 `id` 가 설정 `desk.actions` 화이트리스트에 맞을 때만 나옵니다(기본 빈 목록). 맞지 않으면 글자로만 보이고, 직접 요청하면 403.
   ```json
-  "desk": {"actions": {"cool-report": {"label": "구독 리포트", "argv": ["python", "-m", "cooloff", "report"], "timeout": 20}}}
+  "desk": {"actions": {
+    "cool-report": {"label": "구독 리포트", "argv": ["python", "-m", "cooloff", "report"], "timeout": 20},
+    "paperbutler.done:": {"label": "완료 처리", "argv": ["python", "-m", "paperbutler", "done", "{arg}"], "arg": "digits"}}}
   ```
-  셸 없이 argv 로만 실행하고 결과 코드를 로그에 남깁니다. 읽기 전용 명령만 넣으세요.
+  키가 `:` 로 끝나면 **접두사 항목**입니다. action id `paperbutler.done:12` 의 접미사 `12` 가 `arg` 형식(`digits` = 숫자 1~12자리 기본,
+  `slug` = 영숫자/`-`/`_`)에 통째로 맞을 때만, argv 의 `"{arg}"` 자리에 **한 인자로** 들어갑니다(셸 없음, 인자 일부로 끼우기 불가).
+  셸 없이 argv 로만 실행하고 결과 코드를 로그에 남깁니다. 읽기 전용에 가까운 명령만 넣으세요.
 - **결재 대기**: s21-sidekick `GET /api/approval/pending` 과 jarvis-hub `GET /api/jobs?status=waiting_approval`.
   승인/반려는 **해당 서비스 API로만** 보냅니다(sidekick `POST /api/approval/decide`, jarvis `POST /api/jobs/<id>/approve|reject`).
   `desk.link_only_patterns`(기본 `rm -rf`, `rm -fr`, `claude.task`)에 걸리는 위험 결재는 버튼 없이 서비스 화면 링크만

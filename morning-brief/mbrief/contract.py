@@ -5,12 +5,20 @@
     {"version": 1, "date": "YYYY-MM-DD", "speak_text": "<=300자", "reject_text": "한 줄",
      "sections": [{"id", "title", "items": [{"source", "kind", "text", "detail", "priority", "due", "spoken"}]}],
      "sources": {"<어댑터>": {"status": "ok|disabled|skipped|missing|error", "ok": bool, "items": int, "note": str}},
-     "quiet_day": bool, "speak_budget_chars": int, "dropped": int}
+     "quiet_day": bool, "speak_budget_chars": int, "dropped": int, "tz": "+09:00"}
+
+``date`` 는 브리핑을 만든 PC 의 **로컬 날짜**(설정 ``timezone`` 이 ``"local"`` 일 때. 기본)이고, ``tz`` 는 그 날짜를 계산한
+UTC 오프셋이다. 형제 프로젝트(cool-off, s21-sidekick, paper-butler)가 PC 로컬 날짜를 쓰므로 같은 PC 에서는 항상 같은 날이다.
+다른 PC 가 읽을 때는 ``date`` 만 문자열로 비교하고 ``tz`` 로 시각을 바꾸지 않는다.
 
 ``out/cards-latest.json`` (읽는 쪽: phone-home 사장님 책상)::
 
-    [{"kind": str, "title": str, "detail": str, "due": "YYYY-MM-DD" | "YYYY-MM-DDTHH:MM+09:00" | null,
-      "actions": [str]}]      # due 오름차순, due 없는 카드는 맨 뒤
+    [{"kind": str, "title": str, "detail": str, "due": "YYYY-MM-DD" | "YYYY-MM-DDTHH:MM+HH:MM" | null,
+      "actions": [str | {"id": str, "label": str, "text"?: str}]}]   # due 오름차순, due 없는 카드는 맨 뒤
+
+``actions`` 원소는 문자열(표시 전용 문장) 또는 객체다. 객체의 ``id`` 는 실행 가능한 명령에 대응하는 안정적인 키
+(예: ``"paperbutler.done:12"``), ``label`` 은 버튼 글자, ``text`` 는 사람이 읽는 전체 문장(생략 가능)이다.
+읽는 쪽은 두 형태를 모두 받아야 하고, 자기 화이트리스트에 없는 ``id`` 는 실행하지 않는다.
 
 읽는 쪽은 모르는 키를 무시해야 하고, ``date`` 가 오늘이 아니면 오래된 파일로 본다.
 """
@@ -38,6 +46,14 @@ def _valid_due(v) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _valid_action(a) -> bool:
+    if isinstance(a, str):
+        return True
+    return (isinstance(a, dict) and isinstance(a.get("id"), str) and bool(a["id"])
+            and isinstance(a.get("label"), str) and bool(a["label"])
+            and isinstance(a.get("text", ""), str))
 
 
 def validate_brief(obj) -> list[str]:
@@ -92,8 +108,8 @@ def validate_cards(obj) -> list[str]:
             errs.append("cards[%d] detail 이 문자열이 아님" % i)
         if not _valid_due(c["due"]):
             errs.append("cards[%d] due 형식 오류: %r" % (i, c["due"]))
-        if not isinstance(c["actions"], list) or not all(isinstance(a, str) for a in c["actions"]):
-            errs.append("cards[%d] actions 가 문자열 배열이 아님" % i)
+        if not isinstance(c["actions"], list) or not all(_valid_action(a) for a in c["actions"]):
+            errs.append("cards[%d] actions 가 (문자열 | {id,label}) 배열이 아님" % i)
     if not errs:
         keys = [(c["due"] is None, (c["due"] or "")[:16] if c["due"] and "T" in c["due"] else (c["due"] or "")[:10] + "T00:00")
                 for c in obj]

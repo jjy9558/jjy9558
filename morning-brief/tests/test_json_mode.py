@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from helpers import KST, NOW, World
+from helpers import KST, NOW, World, pb_done
 from mbrief import runner
 from mbrief.sources import BY_NAME
 from mbrief.sources._contract import BadConfig, ContractUnavailable
@@ -125,9 +125,9 @@ class JsonModeTests(JsonModeBase):
         self.assertEqual(kinds["bill"].due, "2026-11-04")
         self.assertIn("서울도시가스 가스요금", kinds["bill"].title)
         self.assertIn("32,400원", kinds["bill"].title)
-        self.assertEqual(kinds["bill"].actions, ("완료 처리: python -m paperbutler done 1",))
+        self.assertEqual(kinds["bill"].actions, (pb_done(1),))
         self.assertIn("쿠팡", kinds["refund"].title)
-        self.assertEqual(kinds["refund"].actions, ("완료 처리: python -m paperbutler done 2",))
+        self.assertEqual(kinds["refund"].actions, (pb_done(2),))
         calls = self.calls()
         self.assertEqual(len(calls), 2)
         self.assertEqual(calls[0]["args"][:2], ["--today", TODAY])

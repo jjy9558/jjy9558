@@ -52,6 +52,7 @@ python -m mbrief check [--out 폴더]            # out/ 의 계약 파일 두 �
 ```
 {"version": 1, "date": "2026-11-02", "quiet_day": false,
  "speak_text": "좋은 아침입니다. 11월 2일 월요일. 오늘 점검: 로스트아크 오전 10시. ...",   # 300자 이내, 항상
+ "tz": "+09:00",                                                                          # date 를 계산한 UTC 오프셋 (참고용)
  "reject_text": "일어나면 해 드립니다",                                                    # 한 줄. 반려 상태일 때 이것만 말하기
  "speak_budget_chars": 300, "dropped": 15,
  "sections": [{"id": "paper_butler", "title": "납부·기한",
@@ -62,9 +63,21 @@ python -m mbrief check [--out 폴더]            # out/ 의 계약 파일 두 �
 `cards-latest.json` — 배열, **마감(`due`) 오름차순**, `due` 없는 카드는 맨 뒤. 키는 정확히 다섯 개.
 ```
 [{"kind": "bill", "title": "서울도시가스 가스요금 32,400원", "detail": "납부기한 2026-11-04 (모레)",
-  "due": "2026-11-04",              # "YYYY-MM-DD" | "YYYY-MM-DDTHH:MM+09:00" | null
-  "actions": ["완료 처리: python -m paperbutler done 1"]}]   # 사람이 읽는 다음 행동 문구 (문자열 배열)
+  "due": "2026-11-04",              # "YYYY-MM-DD" | "YYYY-MM-DDTHH:MM+HH:MM"(브리핑 시각대 오프셋) | null
+  "actions": [{"id": "paperbutler.done:1", "label": "완료 처리",
+               "text": "완료 처리: python -m paperbutler done 1"},   # 실행 가능한 명령에 대응하는 action 객체
+              "공지 열기: https://..."]}]                          # 문자열 = 표시 전용 문장
 ```
+`actions` 원소는 **문자열(표시 전용 문장) 또는 `{id, label[, text]}` 객체** 입니다. `id` 는 안정적인 action 키
+(현재는 `paperbutler.done:<서류 번호>`), `label` 은 버튼 글자, `text` 는 사람이 읽는 전체 문장입니다.
+읽는 쪽은 둘 다 받아야 하며 자기 화이트리스트에 없는 `id` 는 실행하지 않습니다(phone-home 은 문자열을 글자로만 보여 주고
+`desk.actions` 에 맞는 객체 `id` 만 버튼으로 만듭니다). 예전 읽는 쪽은 모르는 형태를 무시하면 됩니다.
+
+**날짜와 시각대.** `date` 는 기본적으로 브리핑을 만든 **PC 의 로컬 날짜**입니다(cool-off, s21-sidekick, paper-butler 와 같은 기준이라
+UTC 미니PC 에서도 "기준일이 달라요" 경고가 없습니다). 설정 `timezone`: `"local"`(기본) | `"+09:00"` 같은 고정 오프셋 | `"UTC"` |
+IANA 이름(`"Asia/Seoul"`, zoneinfo 가 있을 때). 어댑터와 출력(`date`, `due` 의 오프셋, 파일 이름)이 모두 이 시각대를 씁니다.
+`tz` 는 그 오프셋을 알려 줄 뿐이니 소비자는 `date` 문자열을 자기 로컬 날짜와 비교하세요. 예전 `tz_offset_minutes` 는
+`timezone` 을 적지 않은 설정에서만 계속 적용됩니다. sound-watch 의 자체 `utc_offset_minutes` 가 있으면 그 밤 구간은 그 값을 따릅니다.
 `kind`: `maintenance shutdown event bill refund subscription cooloff-ended followup approved declaration first-task
 blocked goal-due flag claude-blocked claude-night job-approval job-failed jobs-done device-offline noise sound-detect news`.
 낭독 전용 줄(커뮤니티 3줄 등)은 카드가 아닙니다. 스키마 검사는 `mbrief/contract.py`(`validate_brief`, `validate_cards`).

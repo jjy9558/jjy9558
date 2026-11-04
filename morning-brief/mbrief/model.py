@@ -35,7 +35,7 @@ class Item:
     speak: str = ""
     speak_short: str = ""
     due: str | None = None
-    actions: tuple[str, ...] = ()
+    actions: tuple = ()      # 문자열(표시 전용) 또는 {"id","label","text"}
     section: str = ""
     card: bool = True
 

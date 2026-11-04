@@ -39,6 +39,12 @@ def _day(value) -> dt.date | None:
         return None
 
 
+def done_action(doc_id: int) -> dict:
+    """phone-home 책상이 화이트리스트(접두사 "paperbutler.done:")로 실행할 수 있는 안정적인 action 키."""
+    return {"id": "paperbutler.done:%d" % doc_id, "label": "완료 처리",
+            "text": "완료 처리: python -m paperbutler done %d" % doc_id}
+
+
 def collect(cfg: dict, ctx: Context) -> list[Item]:
     return _contract.collect_with_mode(NAME, cfg, ctx, lambda: _collect_json(cfg, ctx),
                                        lambda: _collect_direct(cfg, ctx))
@@ -56,7 +62,7 @@ def _bill_item(ctx: Context, today: dt.date, doc_id: int, label: str, who: str, 
     short = "납부 %s %s" % (name, word)
     prio = _prio(days) - (15 if auto else 0)
     title = "%s %s%s" % (name, won_text(amount) if amount is not None else "", " (자동이체)" if auto else "")
-    actions = ("완료 처리: python -m paperbutler done %d" % doc_id,)
+    actions = (done_action(doc_id),)
     return Item(NAME, "bill", title.strip(), "납부기한 %s (%s)" % (due.isoformat(), word), prio,
                 speak, short, due.isoformat(), actions)
 
@@ -69,7 +75,7 @@ def _refund_item(ctx: Context, today: dt.date, doc_id: int, merchant: str, amoun
     return Item(NAME, "refund", "%s 환불·반품 %s" % (who, won_text(amount) if amount is not None else ""),
                 "기한 %s (%s). 정책상 기한이니 판매처에서 확인하세요." % (due.isoformat(), word),
                 _prio(days) - 2, speak, "환불 반품 %s %s까지" % (who, word), due.isoformat(),
-                ("완료 처리: python -m paperbutler done %d" % doc_id,))
+                (done_action(doc_id),))
 
 
 def _collect_json(cfg: dict, ctx: Context) -> list[Item]:

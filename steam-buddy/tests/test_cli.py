@@ -113,6 +113,27 @@ class FlowTests(Base):
         with self.assertRaises(SteamError):
             self.run_cmd("buy", "778")
 
+    def test_buy_offline_with_price_and_name_makes_no_network_call(self):
+        self.fake.calls.clear()
+        self.run_cmd("buy", "10", "--price", "5000", "--name", "Offline")
+        self.assertEqual(self.fake.calls, [])
+        self.assertEqual(self.app.store.get(10)["name"], "Offline")
+        self.assertEqual(self.app.store.get(10)["price_paid"], 5000)
+
+    def test_buy_network_failure_falls_back_with_price(self):
+        def boom(url, params):
+            raise SteamError("offline")
+        self.app.client = SteamClient(fetch=boom)
+        self.run_cmd_keep("buy", "555", "--price", "7000")
+        g = self.app.store.get(555)
+        self.assertEqual((g["name"], g["price_paid"]), ("555", 7000))
+        with self.assertRaises(SteamError):
+            self.run_cmd_keep("buy", "556")
+
+    def run_cmd_keep(self, *argv):
+        args = build_parser().parse_args(list(argv))
+        return getattr(self.app, "cmd_" + args.cmd)(args)
+
     def test_refunded_hidden_from_report(self):
         self.run_cmd("buy", "Hades")
         self.run_cmd("refunded", "Hades")

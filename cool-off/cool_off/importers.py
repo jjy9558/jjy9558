@@ -85,10 +85,11 @@ def import_steam(ledger: Ledger, path) -> dict:
     if not isinstance(games, dict):
         raise LedgerError(f"steam-buddy 데이터가 아니에요 (games 없음): {path}")
 
-    result = {"added": 0, "duplicate": 0, "updated": 0, "skipped": 0}
+    result = {"added": 0, "duplicate": 0, "updated": 0, "skipped": 0, "removed": 0}
     keys = {dedup_key(p["date"], p["price"], p["name"]): p for p in ledger.state["purchases"]}
     for appid in sorted(games, key=str):
         game = games[appid]
+        refunded = isinstance(game, dict) and game.get("refunded") is True
         try:
             name = " ".join(str(game["name"]).split())
             price = int(game.get("price_paid") or 0)
@@ -96,6 +97,13 @@ def import_steam(ledger: Ledger, path) -> dict:
             rating = game.get("rating")
             rating = int(rating) if rating else None
         except (KeyError, TypeError, ValueError):
+            result["skipped"] += 1
+            continue
+        if refunded:  # 환불한 게임은 구매가 아님. 전에 가져온 것이 있으면 지운다(멱등).
+            stale = keys.pop(dedup_key(date, price, name), None)
+            if stale is not None and source_of(stale) == SOURCE_STEAM:
+                ledger.state["purchases"].remove(stale)
+                result["removed"] += 1
             result["skipped"] += 1
             continue
         if not name or price <= 0:  # 무료 게임은 1만원당 점수를 낼 수 없어서 뺍니다.

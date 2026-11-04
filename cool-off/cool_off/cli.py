@@ -349,8 +349,9 @@ class App:
             return False
         self.say(f"스팀 가져오기: 새로 {res['added']}건, 이미 있음 {res['duplicate']}건"
                  f"{', 만족도 갱신 %d건' % res['updated'] if res['updated'] else ''}"
-                 f", 건너뜀 {res['skipped']}건 (무료 게임이거나 형식 오류)")
-        return bool(res["added"] or res["updated"])
+                 f"{', 환불로 제외 %d건' % res['removed'] if res['removed'] else ''}"
+                 f", 건너뜀 {res['skipped']}건 (무료·환불 게임이거나 형식 오류)")
+        return bool(res["added"] or res["updated"] or res["removed"])
 
     def cmd_import_ledger(self, args, ledger: Ledger, now: dt.datetime) -> bool:
         res = importers.import_ledger_csv(ledger, args.csv)

@@ -167,15 +167,21 @@ class App:
 
     # ----- 살 때 / 산 뒤 -----
     def cmd_buy(self, a):
-        appid = self.resolve_remote(a.game)
-        now = self.now()
+        offline = a.price is not None and bool(a.name)
+        q = str(a.game).strip()
         try:
-            d = self.client.app_details(appid)
-            name, price = d["name"], d["price"]
+            appid = int(q) if offline and q.isdigit() else self.resolve_remote(a.game)
+            now = self.now()
+            if offline:
+                name, price = a.name, a.price
+            else:
+                d = self.client.app_details(appid)
+                name, price = d["name"], d["price"]
         except SteamError:
-            if a.price is None or not a.name:
+            if a.price is None or not q.isdigit():
                 raise
-            name, price = a.name, 0
+            appid, name, price = int(q), q, a.price
+            now = self.now()
         if a.name:
             name = a.name
         game = self.store.get(appid) or {}

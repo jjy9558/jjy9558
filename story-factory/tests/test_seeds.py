@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 from storyfactory.seeds import Sources, collect, won_ko, ko_hour
@@ -66,6 +67,37 @@ class SeedTests(unittest.TestCase):
         cards, warnings = collect(src, NOW)
         self.assertEqual(cards, [])
         self.assertGreaterEqual(len(warnings), 4)
+
+    def test_decision_pet_real_storage_fixture(self):
+        import sys
+        root = Path(__file__).resolve().parents[2] / "decision-pet"
+        if not (root / "decision_pet" / "storage.py").exists():
+            self.skipTest("decision-pet 폴더가 없음")
+        sys.path.insert(0, str(root))
+        try:
+            import importlib
+            storage = importlib.import_module("decision_pet.storage")
+            core = importlib.import_module("decision_pet.core")
+        except ImportError:
+            self.skipTest("decision-pet 을 불러올 수 없음")
+        finally:
+            sys.path.remove(str(root))
+        home = self.dir / "pet_home"
+        store = storage.Store(home)
+        state = store.load()
+        for i in range(1, 4):
+            t = core.new_task(i, "미룬 일 %d" % i, now=datetime(2026, 8, 1, 9, 0))
+            t["status"] = "buried"
+            t["times_skipped"] = 5
+            t["bury_reason"] = "skips"
+            state["tasks"].append(t)
+        store.save(state)
+        for target in (home, store.path):   # 폴더와 파일 둘 다
+            cards, warnings = collect(Sources(decision_pet=target), NOW)
+            self.assertEqual(warnings, [])
+            kinds = {c.kind for c in cards}
+            self.assertIn("graveyard_count", kinds)
+            self.assertIn("graveyard_tomb", kinds)
 
     def test_helpers(self):
         self.assertEqual(won_ko(189000), "18만 9천원")

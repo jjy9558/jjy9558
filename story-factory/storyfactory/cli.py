@@ -22,7 +22,7 @@ DEFAULT_SEED = 17
 def _add_source_args(p: argparse.ArgumentParser) -> None:
     g = p.add_argument_group("소재 소스 (모두 읽기 전용)")
     g.add_argument("--life-nagger", metavar="PATH", help="life-nagger counters.jsonl 또는 상태 폴더")
-    g.add_argument("--decision-pet", metavar="PATH", help="decision-pet data.json 또는 폴더 (묘지, voice-journal 가져오기 포함)")
+    g.add_argument("--decision-pet", metavar="PATH", help="decision-pet state.json 또는 폴더 (DECISION_PET_HOME) (묘지, voice-journal 가져오기 포함)")
     g.add_argument("--cool-off", metavar="PATH", help="cool-off data.json 또는 폴더 (후회 목록)")
     g.add_argument("--kakao", metavar="JSON", help="kakao-wrapped --anonymize --json 결과 (익명 통계만 사용, 원문 대화는 읽지 않음)")
     g.add_argument("--voice-journal", metavar="DB", help="voice-journal journal.db (--journal-entry 로 지정한 일기만 읽음)")

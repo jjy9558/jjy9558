@@ -35,7 +35,7 @@ def _task(i, title, skipped, status="buried", reason="skips", created="2026-09-0
 
 
 def make_decision_pet(d: Path) -> Path:
-    p = d / "data.json"
+    p = d / "state.json"
     state = {"version": 1, "next_id": 9, "tasks": [
         _task(1, "책상 서랍 정리", 6),
         _task(2, "영어 단어 외우기", 5, created="2026-08-01T09:00:00"),

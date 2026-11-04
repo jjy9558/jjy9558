@@ -1,7 +1,7 @@
 """소재 카드 수집기. 모든 원본은 읽기 전용으로만 연다(쓰기/삭제 없음).
 
 - life-nagger: counters.jsonl (한숨/푸시업/설거지 카운터)
-- decision-pet: data.json 의 묘지(status=buried), voice-journal 에서 가져온 항목(bury_reason=vjournal) 포함
+- decision-pet: state.json 의 묘지(status=buried), voice-journal 에서 가져온 항목(bury_reason=vjournal) 포함
 - cool-off: data.json 의 후회 목록(만족도 <= 2 또는 '거의 안 씀'), 참은 금액
 - kakao-wrapped: ``--json`` 으로 저장한 *익명화* 통계 JSON 의 숫자 필드만. 원문 대화/멤버 이름/인용은 읽지 않는다.
 - voice-journal: 사용자가 ``--journal-entry`` 로 지정한 일기 id 만. 지정이 없으면 DB 를 열지 않는다.
@@ -26,7 +26,7 @@ MAX_CARDS = 10
 @dataclass
 class Sources:
     life_nagger: Path | None = None       # counters.jsonl 또는 그것이 든 폴더
-    decision_pet: Path | None = None      # data.json 또는 폴더
+    decision_pet: Path | None = None      # state.json 또는 폴더 (DECISION_PET_HOME)
     cool_off: Path | None = None          # data.json 또는 폴더
     kakao: Path | None = None             # kakao-wrapped --json 결과(익명화)
     voice_journal: Path | None = None     # journal.db
@@ -109,7 +109,10 @@ def from_life_nagger(path: Path, now: date, warnings: list[str]) -> list[Card]:
 
 # ------------------------------------------------------------ decision-pet
 def from_decision_pet(path: Path, now: date, warnings: list[str]) -> list[Card]:
-    data = _load_json(_resolve(path, "data.json"), warnings, "decision-pet")
+    target = _resolve(path, "state.json")
+    if target is not None and Path(path).is_dir() and not target.exists() and (Path(path) / "data.json").exists():
+        target = Path(path) / "data.json"  # 예전 이름 호환
+    data = _load_json(target, warnings, "decision-pet")
     if not isinstance(data, dict):
         return []
     buried = [t for t in data.get("tasks", []) if isinstance(t, dict) and t.get("status") == "buried"]

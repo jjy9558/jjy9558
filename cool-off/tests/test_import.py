@@ -78,6 +78,22 @@ class SteamImportTests(ImportBase):
         self.assertIn("새로 0건, 이미 있음 2건", out)
         self.assertEqual(self.state(), first)
 
+    def test_refunded_games_skipped_and_removed_later(self):
+        refunded = {k: dict(v) for k, v in self.GAMES.items()}
+        refunded["1"]["refunded"] = True
+        # 처음부터 환불된 게임은 가져오지 않는다
+        code, out = self.run_cmd(at(2026, 11, 2), "import-steam", str(self.steam_file(refunded)))
+        self.assertEqual({p["name"] for p in self.state()["purchases"]}, {"Unrated"})
+        # 먼저 가져온 뒤 환불되면 지워지고, 다시 가져와도 그대로(멱등)
+        self.run_cmd(at(2026, 11, 3), "import-steam", str(self.steam_file(self.GAMES)))
+        self.assertEqual({p["name"] for p in self.state()["purchases"]}, {"Hades", "Unrated"})
+        path = self.steam_file(refunded)
+        self.run_cmd(at(2026, 11, 4), "import-steam", str(path))
+        self.assertEqual({p["name"] for p in self.state()["purchases"]}, {"Unrated"})
+        first = self.state()
+        self.run_cmd(at(2026, 11, 5), "import-steam", str(path))
+        self.assertEqual(self.state(), first)
+
     def test_later_rating_updates_existing(self):
         self.run_cmd(at(2026, 11, 2), "import-steam", str(self.steam_file(self.GAMES)))
         games = json.loads(json.dumps(self.GAMES))

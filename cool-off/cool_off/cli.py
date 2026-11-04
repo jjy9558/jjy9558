@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import sys
 from typing import Callable, List, Optional, Tuple, Union
 
 import os
 
-from . import core, importers
+from . import contract, core, importers
 from .core import CYCLES, LedgerError, Ledger
 from .notify import Notifier, NotifyError
 from .store import DATA_FILE, Store, StoreError, home_dir
@@ -44,6 +45,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     check = commands.add_parser("check", help="쿨링오프 종료, 사후 확인, 구독 갱신 확인")
     check.add_argument("--ntfy", metavar="TOPIC", help="ntfy 주제로 확인할 항목 알림 보내기")
+    check.add_argument("--json", action="store_true",
+                       help="비대화형 JSON 출력 (데이터 파일을 고치지 않고 알림도 보내지 않음)")
 
     bought = commands.add_parser("bought", help="구매 기록")
     bought.add_argument("name")
@@ -118,6 +121,8 @@ class App:
             args = parser.parse_args(argv)
         except SystemExit as exc:
             return exc.code if isinstance(exc.code, int) else 2
+        if getattr(args, "json", False):
+            return self.run_check_json(args)
         handler = getattr(self, "cmd_" + args.cmd.replace("-", "_"))
         try:
             ledger = Ledger(self.store.load())
@@ -152,6 +157,23 @@ class App:
         return False
 
     # ------------------------------------------------------------ 확인
+
+    def run_check_json(self, args) -> int:
+        """`check --json`: 입력을 받지 않고, 데이터 파일을 쓰지 않고, 알림을 보내지 않습니다.
+
+        오류는 표준 오류로 내보내서 표준 출력에는 JSON만 남깁니다.
+        """
+        if args.ntfy:
+            print("오류: --json과 --ntfy는 함께 쓸 수 없어요.", file=sys.stderr)
+            return 2
+        try:
+            ledger = Ledger(self.store.load())  # load()는 읽기만 합니다.
+            payload = contract.validate(contract.build(ledger, self._now()))
+        except (LedgerError, StoreError, contract.ContractError) as exc:
+            print(f"오류: {exc}", file=sys.stderr)
+            return 1
+        self.say(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
 
     def cmd_check(self, args, ledger: Ledger, now: dt.datetime) -> bool:
         today = now.date()

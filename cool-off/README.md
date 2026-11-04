@@ -33,6 +33,7 @@ python -m cool_off want "에어팟 프로" --price 359000 --why "출퇴근 노�
 python -m cool_off list
 python -m cool_off check                   # 터미널에서 실행하면 y/n/later 로 바로 답함
 python -m cool_off check --ntfy TOPIC      # 확인할 것을 폰(ntfy)으로도 보냄
+python -m cool_off check --json            # 다른 도구 연동용 JSON 출력 (아래 참고)
 python -m cool_off bought "에어팟 프로" --price 329000 [--date 2026-11-02|오늘|어제]
 python -m cool_off sub add 넷플릭스 13500 --cycle monthly --day 15
 python -m cool_off sub add 도메인 120000 --cycle yearly --month 3 --day 31
@@ -99,6 +100,47 @@ python -m cool_off report --week
 1. 폰에 ntfy 앱(https://ntfy.sh)을 설치하고 주제를 구독합니다.
 2. **ntfy 주제는 공개라서 이름만 알면 누구나 읽을 수 있습니다.** 추측하기 어려운 이름을 쓰세요 (예: `cool-off-k3x9q2m7vz41hd`).
 3. `check --ntfy 주제` 로 실행합니다. 같은 항목은 한 번만 보내고, 전송에 실패하면 메시지를 출력하고 다음 `check`에서 다시 보냅니다.
+
+## JSON 출력(다른 도구 연동용)
+
+`check --json`은 확인할 것을 JSON으로 표준 출력에 씁니다. 다른 스크립트나 도구가 읽기 좋게 만든 기능입니다.
+
+```
+python -m cool_off check --json
+```
+
+- **읽기 전용**: 데이터 파일(`data.json`)을 고치지 않습니다. 파일이 없으면 만들지도 않습니다.
+- **묻지 않음**: 터미널에서 실행해도 y/n을 묻지 않습니다.
+- **알림 없음**: ntfy로 아무것도 보내지 않습니다. 그래서 `--ntfy`와 함께 쓰면 오류(종료 코드 2)입니다.
+- **오류**: 데이터 파일을 읽을 수 없으면 오류 메시지는 표준 오류로 나가고 종료 코드는 1입니다. 표준 출력에는 JSON만 나옵니다.
+- **인코딩**: UTF-8입니다.
+
+출력 예 (데이터가 없을 때):
+
+```json
+{
+  "version": 1,
+  "generated_for": "2026-11-04",
+  "cooling_ended": [],
+  "followups_due": [],
+  "renewals": [],
+  "approved_not_bought": []
+}
+```
+
+| 키 | 뜻 | 항목 필드 |
+|---|---|---|
+| `version` | 스키마 버전 (현재 `1`) | — |
+| `generated_for` | 기준 날짜 (`YYYY-MM-DD`) | — |
+| `cooling_ended` | 쿨링오프가 끝난 것 | `id`(문자열), `name`, `price`(원, 정수), `ended`(끝난 날짜) |
+| `followups_due` | 사후 확인 날이 된 구매 | `id`(문자열), `name`, `bought`(구매일) |
+| `renewals` | 3일 안에 갱신되는 구독 | `name`, `amount`(원, 정수), `date`(갱신일), `days_left`(0~3) |
+| `approved_not_bought` | 구매 허가했지만 아직 안 산 것 | `id`(문자열), `name`, `price`(원, 정수) |
+
+- 날짜는 모두 `YYYY-MM-DD` 문자열입니다.
+- 목록이 비어 있으면 빈 배열(`[]`)입니다. 키는 항상 여섯 개가 모두 나옵니다.
+- 월말 결제일은 말일로 당겨집니다 (31일 결제는 2월에 28일 또는 29일). 그래서 `days_left`도 그 날짜 기준입니다.
+- 스키마 검사 코드는 `cool_off/contract.py`에 있습니다 (`SCHEMA_VERSION`, `validate`). 필드를 바꾸면 `SCHEMA_VERSION`을 올립니다.
 
 ## 리포트 계산 방식
 

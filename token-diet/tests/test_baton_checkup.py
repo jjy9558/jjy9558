@@ -1,5 +1,6 @@
 import io
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -112,7 +113,7 @@ class CheckupTests(unittest.TestCase):
         self.assertGreaterEqual(g["untracked"], 1)
         ok, msg = checkup.run_tests(*checkup.detect_tests(self.repo)[:1], self.repo, 60)
         self.assertTrue(ok, msg)
-        self.assertFalse(checkup.run_tests(["python3", "-c", "import time;time.sleep(5)"], self.repo, 1)[0])
+        self.assertFalse(checkup.run_tests([sys.executable, "-c", "import time;time.sleep(5)"], self.repo, 1)[0])
 
     def test_not_git_and_cli_html(self):
         out = io.StringIO()

@@ -107,7 +107,7 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--save", help="저축 봉투: 20%% 또는 금액")
     q.add_argument("--map", action="append", default=[], metavar="봉투=카테고리,...",
                    help="카테고리 매핑 바꾸기 (예: 생활비=식비,교통,쇼핑). 여러 번 가능")
-    q.add_argument("--thresholds", help="경보 기준선 % (기본 70,90,100)")
+    q.add_argument("--thresholds", help="경보 기준선 %% (기본 70,90,100)")
     q = bsub.add_parser("show", parents=[common], help="봉투별 쓴 돈/남은 돈, 하루 쓸 수 있는 돈")
     q.add_argument("--month", help="YYYY-MM (기본: 이번 달)")
     q = bsub.add_parser("alarm", parents=[common], help="기준선(70/90/100%%)을 새로 넘은 봉투 경보 (달·기준선당 1회)")

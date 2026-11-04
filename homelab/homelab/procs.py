@@ -98,7 +98,8 @@ def terminate(pid: int, *, timeout: float = 8.0, alive: Callable[[int], bool] = 
         return True
     if sys.platform == "win32":  # pragma: no cover - 윈도우 전용
         subprocess.run(["taskkill", "/PID", str(pid), "/T"], capture_output=True, shell=False)
-        if _wait_dead(pid, timeout, alive, sleep):
+        # 창 없는 감독자는 /F 없이는 안 꺼지는 게 보통이라, 정중한 요청은 잠깐만 기다린다
+        if _wait_dead(pid, min(timeout, 1.0), alive, sleep):
             return True
         subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, shell=False)
         return _wait_dead(pid, 3.0, alive, sleep)
